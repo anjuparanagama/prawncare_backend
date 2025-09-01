@@ -25,7 +25,28 @@ CREATE TABLE IF NOT EXISTS Inventory (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Insert some sample inventory data
+-- Create the sales table if it doesn't exist
+CREATE TABLE IF NOT EXISTS sales (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    Order_Date DATE NOT NULL,
+    Amount DECIMAL(10,2) NOT NULL,
+    Status VARCHAR(50) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Insert some sample sales data
+INSERT INTO sales (Order_Date, Amount, Status) VALUES
+('2023-01-15', 150.00, 'Completed'),
+('2023-02-20', 200.50, 'Completed'),
+('2023-03-10', 300.75, 'Delivered'),
+('2023-04-05', 250.00, 'Completed'),
+('2023-05-12', 175.25, 'Completed'),
+('2023-06-18', 400.00, 'Delivered'),
+('2023-07-22', 320.50, 'Completed'),
+('2023-08-30', 280.75, 'Completed'),
+('2023-09-14', 350.00, 'Delivered'),
+('2023-10-08', 220.25, 'Completed'),
+('2023-11-25', 190.00, 'Completed'),
 
 
 -- Verify tables were created

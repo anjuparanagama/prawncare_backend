@@ -11,6 +11,7 @@ const itemsRoutes = require('./routes/inventory/items');
 const dashboardRoutes = require('./routes/dashboard/dashboard');
 const loginRoutes = require('./routes/login/login');
 const orderRoutes = require('./routes/orders/order');
+const salesRoutes = require('./routes/sales/sales');
 
 app.use(cors());
 app.use(express.json());
@@ -25,6 +26,7 @@ app.use('/api/inventory', itemsRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 
 app.use('/api/orders', orderRoutes);
+app.use('/api/sales', salesRoutes);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
