@@ -6,10 +6,19 @@ const {log} = require('node:console');
 const router = express.Router();
 
 router.get('/sales', (req, res) => {
-    // Fetch ALL sales records without any status filtering
+    // Fetch sales records with status Completed or Delivered
     const fetchQuery = `
-      SELECT * FROM sales  
-        ORDER BY Order_Date DESC
+      SELECT
+        o.order_id AS Order_ID,
+        c.customer_name AS Customer,
+        o.created_at AS Order_Date,
+        o.status AS Status,
+        o.price AS Amount,
+        o.quantity AS Quantity
+      FROM customer_order o
+      JOIN customer c ON o.customer_id = c.customer_id
+      WHERE o.status IN ('Completed', 'Delivered')
+      ORDER BY o.created_at DESC
     `;
     log('Executing query:', fetchQuery);
 
@@ -23,7 +32,7 @@ router.get('/sales', (req, res) => {
     });
 });
 router.get('/sales/count', (req, res) => {
-    const countQuery = `SELECT COUNT(*) AS totalSales FROM sales WHERE Status IN ('Completed', 'Delivered')`;
+    const countQuery = `SELECT COUNT(*) AS totalSales FROM customer_order WHERE status IN ('Completed', 'Delivered')`;
     db.query(countQuery, (err, results) => {
         if (err) {
             log('Error fetching sales count:', err);
@@ -35,7 +44,7 @@ router.get('/sales/count', (req, res) => {
 });
 
 router.get('/revenue', (req, res) => {
-    const revenueQuery = `SELECT SUM(Amount) AS totalRevenue FROM sales WHERE Status IN ('Completed', 'Delivered')`;
+    const revenueQuery = `SELECT SUM(price) AS totalRevenue FROM customer_order WHERE status IN ('Completed', 'Delivered')`;
     db.query(revenueQuery, (err, results) => {
         if (err) {
             log('Error fetching revenue data:', err);
@@ -47,13 +56,13 @@ router.get('/revenue', (req, res) => {
 });
 router.get('/revenue/monthly', (req, res) => {
   const monthlyRevenueQuery = `
-    SELECT 
-      DATE_FORMAT(Order_Date, '%M') AS month,
-      SUM(Amount) AS revenue
-    FROM sales
-    WHERE Status = 'Completed'
-    GROUP BY MONTH(Order_Date), DATE_FORMAT(Order_Date, '%M')
-    ORDER BY MONTH(Order_Date)
+    SELECT
+      DATE_FORMAT(created_at, '%M') AS month,
+      COUNT(*) AS revenue
+    FROM customer_order
+    WHERE status IN ('Completed', 'Delivered')
+    GROUP BY MONTH(created_at), DATE_FORMAT(created_at, '%M')
+    ORDER BY MONTH(created_at)
   `;
 
   db.query(monthlyRevenueQuery, (err, results) => {

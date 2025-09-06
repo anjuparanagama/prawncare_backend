@@ -34,6 +34,27 @@ CREATE TABLE IF NOT EXISTS sales (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Create the customers table if it doesn't exist
+CREATE TABLE IF NOT EXISTS customers (
+    customer_id INT AUTO_INCREMENT PRIMARY KEY,
+    customer_name VARCHAR(255) NOT NULL,
+    email VARCHAR(255),
+    phone VARCHAR(20),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create the customer_order table if it doesn't exist
+CREATE TABLE IF NOT EXISTS customer_order (
+    order_id INT AUTO_INCREMENT PRIMARY KEY,
+    customer_id INT NOT NULL,
+    prawn_type VARCHAR(100),
+    quantity INT NOT NULL,
+    price DECIMAL(10,2) NOT NULL,
+    status VARCHAR(50) DEFAULT 'Processing',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (customer_id) REFERENCES customers(customer_id)
+);
+
 -- Insert some sample sales data
 INSERT INTO sales (Order_Date, Amount, Status) VALUES
 ('2023-01-15', 150.00, 'Completed'),

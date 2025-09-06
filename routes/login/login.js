@@ -3,10 +3,10 @@ const router = express.Router();
 const db = require("../../db");
 
 router.post('/login', (req, res) => {
-    const { userid, password } = req.body;
+    const { userName, password } = req.body;
 
-    const sql = 'SELECT * FROM users WHERE userid = ? AND password = ?';
-    db.query(sql, [userid, password], (error, results) => {
+    const sql = 'SELECT * FROM admin WHERE name = ? AND password = ?';
+    db.query(sql, [userName, password], (error, results) => {
         if (error) {
             return res.status(500).json({ error: 'Database query failed' });
         }
@@ -17,14 +17,14 @@ router.post('/login', (req, res) => {
             res.status(200).json({ 
                 message: 'Login successful',
                 user: {
-                    id: user.id,
-                    userid: user.userid,
+                    name: user.name,
+                    userName: user.name,
                     created_at: user.created_at
                 }
             });
         } else {
             // Invalid credentials
-            res.status(401).json({ message: 'Invalid User ID or Password' });
+            res.status(401).json({ message: 'Invalid User Name or Password' });
         }
     });
 });

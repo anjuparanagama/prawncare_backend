@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const db = require('../../db');
+const db = require('../../db.js');
 const pdf = require('html-pdf');
 
 router.post('/add', (req, res) => {
@@ -21,7 +21,7 @@ router.post('/add', (req, res) => {
         });
     }
 
-    const sql = 'INSERT INTO items (item_name, date, quantity) VALUES (?, ?, ?)';
+    const sql = 'INSERT INTO Inventory (name, date, quantity) VALUES (?, ?, ?)';
     
     db.query(sql, [itemName, date, parseInt(qty)], (err, result) => {
         if (err) {
@@ -41,7 +41,7 @@ router.post('/add', (req, res) => {
 });
 
 router.get("/items", (req, res) => {
-    const sql = "SELECT id, item_name FROM items";
+    const sql = "SELECT item_id, name FROM inventory";
     db.query(sql, (err, results) => {
       if (err) return res.status(500).json({ error: err.message });
       res.json(results);
@@ -49,7 +49,7 @@ router.get("/items", (req, res) => {
 });
 
 router.get("/downloadpdf", (req, res) => {
-  const sql = "SELECT id, item_name, quantity FROM items";
+  const sql = "SELECT item_id, name, quantity, date FROM inventory";
 
   db.query(sql, (err, results) => {
     if (err) return res.status(500).json({ error: err.message });
@@ -74,14 +74,16 @@ router.get("/downloadpdf", (req, res) => {
                 <th>ID</th>
                 <th>Item Name</th>
                 <th>Quantity</th>
+                <th>Last Update</th>
               </tr>
             </thead>
             <tbody>
               ${results.map(item => `
                 <tr>
-                  <td>${item.id}</td>
-                  <td>${item.item_name}</td>
+                  <td>${item.item_id}</td>
+                  <td>${item.name}</td>
                   <td>${item.quantity}</td>
+                  <td>${item.date}</td>
                 </tr>
               `).join('')}
             </tbody>
