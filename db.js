@@ -1,5 +1,6 @@
 const mysql = require('mysql2');
 require('dotenv').config();
+const { createClient } = require("@supabase/supabase-js");
 
 const connection = mysql.createConnection({
     host : process.env.DB_HOST,
@@ -10,10 +11,22 @@ const connection = mysql.createConnection({
 
 connection.connect((err) => {
     if (err) {
-        console.error('Error connecting to the database:', err);
+        console.error('❌ Localhost Database connection failed:', err);
         return;
     }
-    console.log('Connected to the MySQL database');
+    console.log('✅ Connected to Localhost Database !');
 })
 
+
+let supabase;
+
+if (!process.env.SUPABASE_URL || !process.env.SUPABASE_KEY) {
+    console.error("❌ Supabase connection failed!");
+} else {
+    supabase = createClient(
+        process.env.SUPABASE_URL,
+        process.env.SUPABASE_KEY
+    );
+    console.log("✅ Connected to Supabase !");
+}
 module.exports = connection;
