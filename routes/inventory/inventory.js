@@ -21,7 +21,7 @@ router.post('/add', (req, res) => {
         });
     }
 
-    const sql = 'INSERT INTO Inventory (name, date, quantity) VALUES (?, ?, ?)';
+    const sql = 'INSERT INTO inventory (name, date, quantity) VALUES (?, ?, ?)';
     
     db.query(sql, [itemName, date, parseInt(qty)], (err, result) => {
         if (err) {
@@ -111,7 +111,7 @@ router.get("/downloadpdf", (req, res) => {
 });
 
 router.get('/table', (req, res) => {
-    const sql = 'SELECT * FROM Inventory';
+    const sql = 'SELECT * FROM inventory';
 
     db.query(sql, (err, results) => {
       if (err) {

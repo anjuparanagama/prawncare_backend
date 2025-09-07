@@ -9,12 +9,15 @@ const dashboardRoutes = require('./routes/dashboard/dashboard');
 const loginRoutes = require('./routes/login/login');
 const orderRoutes = require('./routes/orders/order');
 const salesRoutes = require('./routes/sales/sales');
+const signupRoutes = require('./routes/signup/signup');
+const settingsRoutes = require('./routes/settings/settings');
 
 app.use(cors());
 app.use(express.json());
 app.use('/api/register', registerRoutes);
 
 app.use('/api/login', loginRoutes);
+app.use('/api/signup', signupRoutes);
 
 app.use('/api/inventory', inventoryRoutes);
 
@@ -23,6 +26,8 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/orders', orderRoutes);
 
 app.use('/api/sales', salesRoutes);
+
+app.use('/api/settings', settingsRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
