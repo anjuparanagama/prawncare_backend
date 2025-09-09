@@ -3,6 +3,7 @@ const router = express.Router();
 const db = require('../../db.js');
 const { log } = require('node:console');
 
+//get total revenue of customer orders to dispaly dashboard graph
 router.get('/revenue', (req, res) => {
     db.query('SELECT SUM(price) AS totalRevenue FROM customer_order', (err, results) => {
       if (err) {
@@ -41,6 +42,7 @@ router.get('/low-stock', (req, res) => {
   });
 });
 
+// Revenue Data for Chart
 router.get('/data', (req, res) => {
     const sql = `SELECT
       DATE_FORMAT(created_at, '%M') AS month,
@@ -57,6 +59,34 @@ router.get('/data', (req, res) => {
         res.json(results);
       }
     });
+});
+
+// Assign task to worker by individually.
+router.put('/assign-task/:id', (req,res) => {
+  const { id } = req.params;
+  const { title, description } = req.body;
+  const sql = 'INSERT INTO task (title, description, worker_id) VALUES (?, ?, ?)';
+
+  db.query(sql, [title, description, id], (err,result) => {
+    if (err) {
+      console.error('error adding data:', err);
+      res.status(500).json({error:'database query failed'});
+    } else {
+      res.json({message: 'Task assigned successfully', taskId: result.insertId});
+    }
+  });
+});
+
+// Get worker details for task assignment
+router.get('/getworkerdetails', (req,res) => {
+  db.query('SELECT id, name FROM worker', (err, results) => {
+    if (err) {
+      console.error('error fetching data:', err);
+      res.status(500).json({error:'database query failed'});
+    } else {
+      res.json(results);
+    }
+  });
 });
 
 module.exports = router;

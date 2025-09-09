@@ -11,6 +11,8 @@ const orderRoutes = require('./routes/orders/order');
 const salesRoutes = require('./routes/sales/sales');
 const signupRoutes = require('./routes/signup/signup');
 const settingsRoutes = require('./routes/settings/settings');
+const purchaseRoutes = require('./routes/purchase/purchase');
+
 
 app.use(cors());
 app.use(express.json());
@@ -28,6 +30,8 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/sales', salesRoutes);
 
 app.use('/api/settings', settingsRoutes);
+
+app.use('/api/purchase', purchaseRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

@@ -5,6 +5,7 @@ const {log} = require('node:console');
 
 const router = express.Router();
 
+//get sales records where status = completed or delivered to tables and sales frontend
 router.get('/sales', (req, res) => {
     // Fetch sales records with status Completed or Delivered
     const fetchQuery = `
@@ -31,6 +32,8 @@ router.get('/sales', (req, res) => {
         }
     });
 });
+
+//get sales count where status = completed or delivered to update totalsales to sales graph
 router.get('/sales/count', (req, res) => {
     const countQuery = `SELECT COUNT(*) AS totalSales FROM customer_order WHERE status IN ('Completed', 'Delivered')`;
     db.query(countQuery, (err, results) => {
@@ -43,6 +46,7 @@ router.get('/sales/count', (req, res) => {
     });
 });
 
+//get sum of revenues in sales where status = completed or delivered to update totalsales to sales graph and dashboard cards
 router.get('/revenue', (req, res) => {
     const revenueQuery = `SELECT SUM(price) AS totalRevenue FROM customer_order WHERE status IN ('Completed', 'Delivered')`;
     db.query(revenueQuery, (err, results) => {
@@ -54,6 +58,8 @@ router.get('/revenue', (req, res) => {
         }
     });
 });
+
+//get monthly revenue data for sales graph
 router.get('/revenue/monthly', (req, res) => {
   const monthlyRevenueQuery = `
     SELECT

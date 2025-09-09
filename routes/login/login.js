@@ -4,6 +4,7 @@ const db = require("../../db");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 
+//still not build jwt function
 // Secret key for JWT (keep safe in .env)
 const JWT_SECRET = "your_super_secret_key";
 
@@ -23,6 +24,7 @@ function generateToken(user, role) {
     );
 }
 
+//Admin login
 router.post('/login', (req, res) => {
     const { userName, password } = req.body;
 
@@ -50,6 +52,7 @@ router.post('/login', (req, res) => {
     });
 });
 
+//customer login
 router.post("/customer-login", (req, res) => {
     const { userNameOrEmail, password } = req.body;
 
@@ -94,6 +97,7 @@ router.post("/customer-login", (req, res) => {
     });
 });
 
+//worker login
 router.post("/worker-login", (req, res) => {
     const { userNameOrEmail, password } = req.body;
 
@@ -137,6 +141,7 @@ router.post("/worker-login", (req, res) => {
     });
 });
 
+//supplier login
 router.post("/supplier-login", (req, res) => {
     const { userNameOrEmail, password } = req.body;
 
@@ -179,4 +184,6 @@ router.post("/supplier-login", (req, res) => {
         }
     });
 });
+
+
 module.exports = router;
