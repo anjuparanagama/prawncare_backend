@@ -40,7 +40,7 @@ router.post("/customer-signup", async (req, res) => {
 
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        const sql = "INSERT INTO customer (name, email, password, mobile_no) VALUES (?, ?, ?, ?)";
+        const sql = "INSERT INTO customer (customer_name, email, password, mobile_no) VALUES (?, ?, ?, ?)";
         db.query(sql, [name, email, hashedPassword, mobile_no], (error, result) => {
             if (error) {
                 console.error("Signup error (customer):", error);
