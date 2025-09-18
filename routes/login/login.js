@@ -77,7 +77,7 @@ router.post("/customer-login", (req, res) => {
             }
 
             const token = generateToken(
-                { id: customer.customer_id, name: customer.name, email: customer.email },
+                { id: customer.customer_id, name: customer.customer_name, email: customer.email },
                 "customer"
             );
 
@@ -86,7 +86,7 @@ router.post("/customer-login", (req, res) => {
                 token,
                 user: {
                     id: customer.customer_id,
-                    name: customer.name,
+                    name: customer.customer_name,
                     email: customer.email,
                     created_at: customer.created_at,
                 },

@@ -351,4 +351,31 @@ router.get('/order/:id/receipt', (req, res) => {
     });
 });
 
+router.patch('/order/:id/receipt/Assign-By', (req,res) =>{
+    const orderId = req.params.id;
+    const { assigned_by } = req.body;
+
+    if (!assigned_by) {
+        return res.status(400).json({ error: 'Assigned By field is required' });
+    }
+
+    const sqlQuery = `
+        UPDATE customer_order
+        SET assigned_by = ?
+        WHERE order_id = ?
+    `;
+
+    db.query(sqlQuery, [assigned_by, orderId], (err, result) => {
+        if (err) {
+            console.error('Error updating Assigned By:', err);
+            return res.status(500).json({ error: 'Error updating Assigned By' });
+        }
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: 'Order not found' });
+        }
+        res.json({ message: 'Assigned By updated successfully' });
+    });
+});
+
 module.exports = router;
+ 

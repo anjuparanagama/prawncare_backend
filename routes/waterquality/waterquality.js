@@ -1,0 +1,111 @@
+const express = require("express");
+const fetch = require("node-fetch");
+const cron = require("node-cron");
+const router = express.Router();
+const db = require("../../db");
+
+//Save ESP data to mysql DB every 6 hour by cron job
+const ESP_IP = "";
+
+async function saveSensorsData () {
+    try {
+        const response = await fetch(`http://${ESP_IP}/sensors`);
+        const data = await response.json();
+
+        const sql = 'INSERT INTO sensors_data (Pond_ID, WaterTemp, pH, TDS, Water_Level) VALUES (?, ?, ?, ?, ?)';
+
+        const values = [1, data.waterTemp, data.ph, data.tds, data.waterlevel]; // Assuming pond_id = 1
+
+        db.query(sql, values, (err, result) => {
+            if (err) {
+                console.error('Error inserting data: ', err);
+            } else {
+                console.log('Data inserted successfully');
+            }
+        });
+    } catch (error) {
+        console.error('Error fetching sensor data: ', error);
+    }
+}
+
+cron.schedule('0 */6 * * *', () => {
+    console.log("Scheduled Task Running for Sensors Data...")
+    saveSensorsData();
+});
+
+router.get('/sensor-data', (req, res) => {
+    const sql = `
+        SELECT 
+            s.Pond_ID,
+            s.Water_Level,
+            s.WaterTemp,
+            s.pH,
+            s.TDS,
+            DATE(s.Updated_at) AS Date,
+            CONCAT(LPAD(HOUR(s.Updated_at), 2, '0'), '.00') AS Time
+        FROM sensors_data s
+        ORDER BY s.Pond_ID ASC, Date DESC, Time DESC
+    `;
+
+    db.query(sql, (err, results) => {
+        if (err) {
+            console.error(err);
+            return res.status(500).json({ error: 'Database query failed' });
+        }
+
+        res.json(results);
+    });
+});
+
+// Helper SQL: latest record per pond
+const baseQuery = `
+  SELECT s.Pond_ID, s.Water_Level, s.pH, s.WaterTemp, s.TDS
+  FROM sensors_data s
+  INNER JOIN (
+    SELECT Pond_ID, MAX(Updated_at) AS latest_time
+    FROM sensors_data
+    GROUP BY Pond_ID
+  ) latest
+  ON s.Pond_ID = latest.Pond_ID AND s.Updated_at = latest.latest_time
+`; 
+
+// Average Water Level
+router.get("/average-water-level", (req, res) => {
+  const sql = `SELECT AVG(t.Water_Level) AS avg_water_level FROM (${baseQuery}) t;`;
+  db.query(sql, (err, result) => {
+    if (err) return res.status(500).json({ error: "DB query failed" });
+    const avg = result[0].avg_water_level;
+    res.json({ average_water_level: avg !== null ? Number(avg).toFixed(2) : null });
+  });
+});
+
+// Average pH
+router.get("/average-ph", (req, res) => {
+  const sql = `SELECT AVG(t.pH) AS avg_pH FROM (${baseQuery}) t;`;
+  db.query(sql, (err, result) => {
+    if (err) return res.status(500).json({ error: "DB query failed" });
+    const avg = result[0] ? result[0].avg_pH : null;
+    res.json({ average_pH: avg !== null ? Number(avg).toFixed(2) : null });
+  });
+});
+
+// Average Temperature
+router.get("/average-temperature", (req, res) => {
+  const sql = `SELECT AVG(t.WaterTemp) AS avg_temperature FROM (${baseQuery}) t;`;
+  db.query(sql, (err, result) => {
+    if (err) return res.status(500).json({ error: "DB query failed" });
+    const avg = result[0] ? result[0].avg_temperature : null;
+    res.json({ average_temperature: avg !== null ? Number(avg).toFixed(2) : null });
+  });
+});
+
+// Average TDS
+router.get("/average-tds", (req, res) => {
+  const sql = `SELECT AVG(t.TDS) AS avg_tds FROM (${baseQuery}) t;`;
+  db.query(sql, (err, result) => {
+    if (err) return res.status(500).json({ error: "DB query failed" });
+    const avg = result[0] ? result[0].avg_tds : null;
+    res.json({ average_tds: avg !== null ? Number(avg).toFixed(2) : null });
+  });
+});
+module.exports= router;
