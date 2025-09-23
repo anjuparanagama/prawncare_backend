@@ -4,9 +4,7 @@ const db = require("../../db");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 
-//still not build jwt function
-// Secret key for JWT (keep safe in .env)
-const JWT_SECRET = "your_super_secret_key";
+const JWT_SECRET = "123abc";
 
 /**
  * Generate JWT token

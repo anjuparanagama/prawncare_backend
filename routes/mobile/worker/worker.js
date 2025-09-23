@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+const cron = require("node-cron");
 const db = require("../../../db"); // MySQL connection
 
 //display all approved orders to worker dashboard
@@ -27,5 +28,48 @@ router.patch("/Update-Order-Status", (req,res) => {
         res.json({ message: 'Order status updated successfully' });
     });
 });
+
+//feeding reminder system
+let reminders = [];
+
+// Check feeding times every , * - in minute → every minute, * - in hour → every hour, * - in day of month → every day, * -  in month → every month, * - in day of week → every day of week
+cron.schedule("* * * * *", () => {
+  const now = new Date();
+  const currentTime = `${now.getHours().toString().padStart(2, "0")}:${now
+    .getMinutes()
+    .toString()
+    .padStart(2, "0")}:00`;
+
+  const sql = `
+    SELECT feeding_ID, Pond_ID, feeding_time 
+    FROM feeding_schedule
+    WHERE TIMEDIFF(feeding_time, ?) = '00:15:00'
+  `;
+
+  db.query(sql, [currentTime], (err, results) => {
+    if (err) {
+      console.error("Error checking reminders:", err);
+    } else if (results.length > 0) {
+      results.forEach((row) => {
+        const reminder = {
+          feeding_ID: row.feeding_ID,
+          pond_ID: row.Pond_ID,
+          reminder_time: currentTime,
+          message: `Feeding reminder: Pond ${row.Pond_ID} needs feeding at ${row.feeding_time}`
+        };
+        reminders.push(reminder);
+        console.log("Reminder created:", reminder);
+      });
+    }
+  });
+});
+
+// Endpoint for Flutter app to fetch reminders
+router.get("/reminders", (req, res) => {
+  res.json(reminders);
+  reminders = []; // clear after sending so Flutter doesn’t get duplicates
+});
+
+
 
 module.exports = router;
