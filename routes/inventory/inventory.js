@@ -35,7 +35,7 @@ router.post('/add', (req, res) => {
         
         res.json({
             success: true,
-            message: "Item added successfully",
+            message: `New Item = ${itemName} successfully added to Database`,
             id: result.insertId
         });
     });
@@ -53,7 +53,7 @@ router.get("/items", (req, res) => {
 
 //create download pdf api to inventory items.
 router.get("/downloadpdf", (req, res) => {
-  const sql = "SELECT item_id, name, quantity, date FROM inventory";
+  const sql = "  SELECT item_id, name, quantity, DATE_FORMAT(date, '%W %e %M %Y') AS formatted_date FROM inventory";
 
   db.query(sql, (err, results) => {
     if (err) return res.status(500).json({ error: err.message });
@@ -87,7 +87,7 @@ router.get("/downloadpdf", (req, res) => {
                   <td>${item.item_id}</td>
                   <td>${item.name}</td>
                   <td>${item.quantity}</td>
-                  <td>${item.date}</td>
+                  <td>${item.formatted_date}</td>
                 </tr>
               `).join('')}
             </tbody>
@@ -132,25 +132,105 @@ router.get('/table', (req, res) => {
   });
 
 
-//update inventory items table when if inventory items using
-router.put('/update/:id', (req,res) =>{
+//update inventory items table when if inventory items adding to previous stock
+router.put('/issue/:id', (req,res) =>{
   const { id } = req.params;
-  const { qty, date } = req.body;
-  const sql = "UPDATE items SET quantity = quantity + ?, date = ? WHERE id = ?";
+  const itemId = parseInt(id);
+  const { qty, date } = req.body || {};
 
-  db.query(sql, [qty, date, id], (err, result) => {
+  // Input validation
+  if (!id || id === 'undefined' || isNaN(itemId)) {
+      return res.status(400).json({
+          success: false,
+          message: "Valid item ID is required"
+      });
+  }
+
+  if (!qty || qty === '' || isNaN(qty) || parseInt(qty) < 0) {
+      return res.status(400).json({
+          success: false,
+          message: "Valid quantity is required (must be a positive number)"
+      });
+  }
+
+  if (!date) {
+      return res.status(400).json({
+          success: false,
+          message: "Date is required"
+      });
+  }
+
+  const sql = "UPDATE inventory SET quantity = quantity - ?, date = ? WHERE item_id = ?";
+
+  db.query(sql, [parseInt(qty), date, itemId], (err, result) => {
       if (err) {
-          console.error('ERROR:', err);
-          return res.status(500).json({ 
-              success: false, 
-              message: "Database error occurred while updating item" 
+          console.error('SQL ERROR:', err);
+          return res.status(500).json({
+              success: false,
+              message: "Database error occurred while updating item",
+              error: err.message
           });
       }
 
       if (result.affectedRows === 0) {
-          return res.status(404).json({ 
-              success: false, 
-              message: "Item not found" 
+          return res.status(404).json({
+              success: false,
+              message: "Item not found"
+          });
+      }
+
+      res.json({
+          success: true,
+          message: "Item Issued Successfully and Update Stock..."
+      });
+  })
+})
+
+
+//update inventory items table when if inventory items using
+router.put('/update/:id', (req,res) =>{
+  const { id } = req.params;
+  const itemId = parseInt(id);
+  const { qty, date } = req.body || {};
+
+  // Input validation
+  if (!id || id === 'undefined' || isNaN(itemId)) {
+      return res.status(400).json({
+          success: false,
+          message: "Valid item ID is required"
+      });
+  }
+
+  if (!qty || qty === '' || isNaN(qty) || parseInt(qty) < 0) {
+      return res.status(400).json({
+          success: false,
+          message: "Valid quantity is required (must be a positive number)"
+      });
+  }
+
+  if (!date) {
+      return res.status(400).json({
+          success: false,
+          message: "Date is required"
+      });
+  }
+
+  const sql = "UPDATE inventory SET quantity = quantity + ?, date = ? WHERE item_id = ?";
+
+  db.query(sql, [parseInt(qty), date, itemId], (err, result) => {
+      if (err) {
+          console.error('SQL ERROR:', err);
+          return res.status(500).json({
+              success: false,
+              message: "Database error occurred while updating item",
+              error: err.message
+          });
+      }
+
+      if (result.affectedRows === 0) {
+          return res.status(404).json({
+              success: false,
+              message: "Item not found"
           });
       }
 
@@ -160,5 +240,7 @@ router.put('/update/:id', (req,res) =>{
       });
   })
 })
+
+
 
 module.exports = router;

@@ -3,6 +3,7 @@ const fetch = require("node-fetch");
 const cron = require("node-cron");
 const router = express.Router();
 const db = require("../../db");
+const pdf = require('html-pdf');
 
 //Save ESP data to mysql DB every 6 hour by cron job
 const ESP_IP = "";
@@ -108,4 +109,86 @@ router.get("/average-tds", (req, res) => {
     res.json({ average_tds: avg !== null ? Number(avg).toFixed(2) : null });
   });
 });
+
+//download pdf of water quality data
+router.get('/downloadpdf', (req,res) => {
+  const { start, end } = req.query;
+  let sql = `
+              SELECT s.Pond_ID, s.Water_Level, s.pH, s.WaterTemp, s.TDS, DATE_FORMAT(s.Updated_at, '%W, %d %M %Y') AS Date, CONCAT(LPAD(HOUR(s.Updated_at), 2, '0'), '.00') AS Time
+              FROM sensors_data s
+            `;
+  const params = [];
+  if (start && end) {
+      sql += ` WHERE DATE(s.Updated_at) BETWEEN ? AND ?`;
+      params.push(start, end);
+  }
+  sql += ` ORDER BY s.Updated_at DESC`;
+
+  db.query(sql, params, (err, results) => {
+      if (err)
+          return res.status(500).json({ error: err.message });
+
+      const html =
+                  `
+                  <html>
+                      <head>
+                      <title>Water Quality List</title>
+                      <style>
+                          body { font-family: Arial, sans-serif; margin: 20px; }
+                          h1 { color: #333; }
+                          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                          th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
+                          th { background-color: #f2f2f2; }
+                      </style>
+                      </head>
+                      <body>
+                      <h1>Water Quality Report</h1>
+                      <table>
+                          <thead>
+                          <tr>
+                              <th>Pond ID</th>
+                              <th>Date</th>
+                              <th>Time</th>
+                              <th>Water level</th>
+                              <th>pH level</th>
+                              <th>Salinity level</th>
+                              <th>Temperature</th>
+                          </tr>
+                          </thead>
+                          <tbody>
+                          ${results.map(sensor => `
+                              <tr>
+                              <td>${sensor.Pond_ID}</td>
+                              <td>${sensor.Date}</td>
+                              <td>${sensor.Time}</td>
+                              <td>${sensor.Water_Level}</td>
+                              <td>${sensor.pH}</td>
+                              <td>${sensor.TDS}</td>
+                              <td>${sensor.WaterTemp}</td>
+                              </tr>
+                          `).join('')}
+                          </tbody>
+                      </table>
+                      </body>
+                  </html>
+                  `;
+
+              const options = {
+                  format: 'A4',
+                  orientation: 'portrait'
+              };
+
+              pdf.create(html, options).toBuffer((err, buffer) => {
+                  if (err) {
+                      console.error('PDF generation error:', err);
+                      return res.status(500).json({ error: 'Failed to generate PDF' });
+              }
+
+              res.setHeader('Content-Type', 'application/pdf');
+              res.setHeader('Content-Disposition', 'attachment; filename="water_quality_report.pdf"');
+              res.send(buffer);
+              });
+  });
+});
+
 module.exports= router;

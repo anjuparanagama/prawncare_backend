@@ -9,7 +9,7 @@ const JWT_SECRET = "123abc";
 /**
  * Generate JWT token
  */
-function generateToken(user, role) {
+function generateToken(user, role, expiresIn = "7d") {
     return jwt.sign(
         {
             id: user.id,
@@ -18,13 +18,13 @@ function generateToken(user, role) {
             role: role
         },
         JWT_SECRET,
-        { expiresIn: "7d" } // Token valid for 7 days
+        { expiresIn: expiresIn }
     );
 }
 
 //Admin login
 router.post('/login', (req, res) => {
-    const { userName, password } = req.body;
+    const { userName, password, rememberMe } = req.body;
 
     const sql = 'SELECT * FROM admin WHERE name = ? AND password = ?';
     db.query(sql, [userName, password], (error, results) => {
@@ -34,9 +34,15 @@ router.post('/login', (req, res) => {
 
         if (results.length > 0) {
             const user = results[0];
+            const token = generateToken(
+                { id: user.id, name: user.name, email: user.email || '' },
+                "admin",
+                rememberMe ? "30d" : "1d"
+            );
             // Login successful
-            res.status(200).json({ 
+            res.status(200).json({
                 message: 'Login successful',
+                token,
                 user: {
                     name: user.name,
                     userName: user.name,

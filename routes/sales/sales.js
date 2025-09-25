@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const db = require('../../db.js');
 const {log} = require('node:console');
+const pdf = require('html-pdf');
 
 const router = express.Router();
 
@@ -81,4 +82,91 @@ router.get('/revenue/monthly', (req, res) => {
   });
 });
 
+
+//download pdf of Sales Data.
+router.get('/downloadpdf', (req,res) => {
+  const { start, end } = req.query;
+  let sql = `
+              SELECT
+              o.order_id AS Order_ID,
+              c.customer_name AS Customer,
+              DATE_FORMAT(o.created_at, '%W %e %M %Y') AS Order_Date,
+              o.status AS Status,
+              o.price AS Amount,
+              o.quantity AS Quantity
+              FROM customer_order o
+              JOIN customer c ON o.customer_id = c.customer_id
+              WHERE o.status IN ('Completed', 'Delivered')
+            `;
+  const params = [];
+  if (start && end) {
+      sql += ` AND DATE(o.created_at) BETWEEN ? AND ?`;
+      params.push(start, end);
+  }
+  sql += ` ORDER BY o.created_at DESC`;
+
+  db.query(sql, params, (err, results) => {
+      if (err)
+          return res.status(500).json({ error: err.message });
+
+      const html =
+                  `
+                  <html>
+                      <head>
+                      <title>Sales List</title>
+                      <style>
+                          body { font-family: Arial, sans-serif; margin: 20px; }
+                          h1 { color: #333; }
+                          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                          th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
+                          th { background-color: #f2f2f2; }
+                      </style>
+                      </head>
+                      <body>
+                      <h1>Sales Report</h1>
+                      <table>
+                          <thead>
+                          <tr>
+                              <th>Order ID</th>
+                              <th>Customer</th>
+                              <th>Date</th>
+                              <th>Status</th>
+                              <th>Amount</th>
+                              <th>Quantity</th>
+                          </tr>
+                          </thead>
+                          <tbody>
+                          ${results.map(sales => `
+                              <tr>
+                              <td>${sales.Order_ID}</td>
+                              <td>${sales.Customer}</td>
+                              <td>${sales.Order_Date}</td>
+                              <td>${sales.Status}</td>
+                              <td>${sales.Amount}</td>
+                              <td>${sales.Quantity}</td>
+                              </tr>
+                          `).join('')}
+                          </tbody>
+                      </table>
+                      </body>
+                  </html>
+                  `;
+
+              const options = {
+                  format: 'A4',
+                  orientation: 'portrait'
+              };
+
+              pdf.create(html, options).toBuffer((err, buffer) => {
+                  if (err) {
+                      console.error('PDF generation error:', err);
+                      return res.status(500).json({ error: 'Failed to generate PDF' });
+              }
+
+              res.setHeader('Content-Type', 'application/pdf');
+              res.setHeader('Content-Disposition', 'attachment; filename="sales_report.pdf"');
+              res.send(buffer);
+              });
+  });
+});
 module.exports = router;

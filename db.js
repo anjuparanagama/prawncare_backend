@@ -15,7 +15,18 @@ connection.connect((err) => {
         return;
     }
     console.log('✅ Connected to Localhost Database !');
-})
+});
+
+// Handle connection errors and attempt reconnection
+connection.on('error', (err) => {
+    console.error('Database connection error:', err);
+    if (err.code === 'PROTOCOL_CONNECTION_LOST' || err.code === 'ECONNRESET') {
+        console.log('Attempting to reconnect...');
+        connection.connect();
+    } else {
+        throw err;
+    }
+}); 
 
 
 let supabase;

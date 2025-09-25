@@ -28,7 +28,10 @@ router.get('/orders', (req, res) => {
 // ✅ Low Stock API
 router.get('/low-stock', (req, res) => {
   const query = `
-    SELECT item_id, name, quantity FROM inventory WHERE quantity < 10`;
+    SELECT COUNT(*) AS total_items
+    FROM inventory
+    WHERE quantity < (threshold + 25);
+  `;
 
   db.query(query, (err, results) => {
     if (err) {
@@ -37,10 +40,11 @@ router.get('/low-stock', (req, res) => {
     }
 
     res.json({
-      lowStockItems: results.length
+      lowStockItems: results[0].total_items
     });
   });
 });
+
 
 // Revenue Data for Chart
 router.get('/data', (req, res) => {
