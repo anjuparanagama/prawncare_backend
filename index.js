@@ -19,6 +19,7 @@ const waterQualityRoutes   = require('./routes/waterquality/waterquality');
 
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use('/api/register', registerRoutes);
 
 app.use('/api/login', loginRoutes);

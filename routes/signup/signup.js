@@ -25,23 +25,29 @@ function generateToken(user, role) {
 router.post("/customer-signup", async (req, res) => {
     const { name, email, password, confirmPassword, mobile_no } = req.body;
 
-    if (!name || !email || !password || !confirmPassword || !mobile_no) {
+    // Trim inputs
+    const trimmedName = name?.trim();
+    const trimmedEmail = email?.trim();
+    const trimmedPassword = password?.trim();
+    const trimmedConfirmPassword = confirmPassword?.trim();
+
+    if (!trimmedName || !trimmedEmail || !trimmedPassword || !trimmedConfirmPassword || !mobile_no) {
         return res.status(400).json({ message: "All fields are required" });
     }
 
-    if (password !== confirmPassword) {
+    if (trimmedPassword !== trimmedConfirmPassword) {
         return res.status(400).json({ message: "Passwords do not match" });
     }
 
     // Check if email exists
-    db.query("SELECT * FROM customer WHERE email = ?", [email], async (err, results) => {
+    db.query("SELECT * FROM customer WHERE email = ?", [trimmedEmail], async (err, results) => {
         if (err) return res.status(500).json({ error: "Database error" });
         if (results.length > 0) return res.status(400).json({ message: "Email already exists" });
 
-        const hashedPassword = await bcrypt.hash(password, 10);
+        const hashedPassword = await bcrypt.hash(trimmedPassword, 10);
 
         const sql = "INSERT INTO customer (customer_name, email, password, mobile_no) VALUES (?, ?, ?, ?)";
-        db.query(sql, [name, email, hashedPassword, mobile_no], (error, result) => {
+        db.query(sql, [trimmedName, trimmedEmail, hashedPassword, mobile_no], (error, result) => {
             if (error) {
                 console.error("Signup error (customer):", error);
                 return res.status(500).json({ error: "Database insert failed" });
@@ -65,22 +71,28 @@ router.post("/customer-signup", async (req, res) => {
 router.post("/supplier-signup", async (req, res) => {
     const { name, email, password, confirmPassword, mobile_no } = req.body;
 
-    if (!name || !email || !password || !confirmPassword || !mobile_no) {
+    // Trim inputs
+    const trimmedName = name?.trim();
+    const trimmedEmail = email?.trim();
+    const trimmedPassword = password?.trim();
+    const trimmedConfirmPassword = confirmPassword?.trim();
+
+    if (!trimmedName || !trimmedEmail || !trimmedPassword || !trimmedConfirmPassword || !mobile_no) {
         return res.status(400).json({ message: "All fields are required" });
     }
 
-    if (password !== confirmPassword) {
+    if (trimmedPassword !== trimmedConfirmPassword) {
         return res.status(400).json({ message: "Passwords do not match" });
     }
 
-    db.query("SELECT * FROM supplier WHERE email = ?", [email], async (err, results) => {
+    db.query("SELECT * FROM supplier WHERE email = ?", [trimmedEmail], async (err, results) => {
         if (err) return res.status(500).json({ error: "Database error" });
         if (results.length > 0) return res.status(400).json({ message: "Email already exists" });
 
-        const hashedPassword = await bcrypt.hash(password, 10);
+        const hashedPassword = await bcrypt.hash(trimmedPassword, 10);
 
         const sql = "INSERT INTO supplier (name, email, password, mobile_no) VALUES (?, ?, ?, ?)";
-        db.query(sql, [name, email, hashedPassword, mobile_no], (error, result) => {
+        db.query(sql, [trimmedName, trimmedEmail, hashedPassword, mobile_no], (error, result) => {
             if (error) {
                 console.error("Signup error (supplier):", error);
                 return res.status(500).json({ error: "Database insert failed" });
@@ -102,8 +114,13 @@ router.post("/supplier-signup", async (req, res) => {
 router.post('/register-worker', async (req, res) => {
     const { name, email, password, mobile_no } = req.body;
 
+    // Trim inputs
+    const trimmedName = name?.trim();
+    const trimmedEmail = email?.trim();
+    const trimmedPassword = password?.trim();
+
     // 1. Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = await bcrypt.hash(trimmedPassword, 10);
 
     // 2. Insert worker into DB
     const sql = "INSERT INTO worker (name, email, password, mobile_no) VALUES (?, ?, ?, ?)";
