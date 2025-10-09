@@ -5,6 +5,7 @@ const { log } = require('node:console');
 
 //get total revenue of customer orders to dispaly dashboard graph
 router.get('/revenue', (req, res) => {
+  try {
     db.query('SELECT SUM(price) AS totalRevenue FROM customer_order', (err, results) => {
       if (err) {
         log('Error in revenue query:', err);
@@ -12,6 +13,10 @@ router.get('/revenue', (req, res) => {
       }
       res.json({ totalRevenue: results[0].totalRevenue });
     });
+  } catch (error) {
+    log('sync error:', error);
+    res.status(500).json({ error: 'Database connection failed' });
+  }
 });
 
 // ✅ Orders API
@@ -45,7 +50,6 @@ router.get('/low-stock', (req, res) => {
   });
 });
 
-
 // Revenue Data for Chart
 router.get('/data', (req, res) => {
     const sql = `SELECT
@@ -71,14 +75,19 @@ router.put('/assign-task/:id', (req,res) => {
   const { title, description } = req.body;
   const sql = 'INSERT INTO task (title, description, worker_id) VALUES (?, ?, ?)';
 
-  db.query(sql, [title, description, id], (err,result) => {
-    if (err) {
-      console.error('error adding data:', err);
-      res.status(500).json({error:'database query failed'});
-    } else {
-      res.json({message: 'Task assigned successfully', taskId: result.insertId});
-    }
-  });
+  try {
+    db.query(sql, [title, description, id], (err,result) => {
+      if (err) {
+        console.error('error adding data:', err);
+        res.status(500).json({error:'database query failed'});
+      } else {
+        res.json({message: 'Task assigned successfully', taskId: result.insertId});
+      }
+    });
+  } catch (error) {
+    console.error('sync error:', error);
+    res.status(500).json({error: 'database connection failed'});
+  }
 });
 
 // Get worker details for task assignment

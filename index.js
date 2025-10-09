@@ -14,6 +14,7 @@ const settingsRoutes       = require('./routes/settings/settings');
 const purchaseRoutes       = require('./routes/purchase/purchase');
 const mobileCustomerRoutes = require('./routes/mobile/customer/customer');
 const mobileWorkerRoutes   = require('./routes/mobile/worker/worker');
+const mobileSupplierRoutes = require('./routes/mobile/supplier/supplier');
 const waterQualityRoutes   = require('./routes/waterquality/waterquality');
 
 
@@ -40,6 +41,8 @@ app.use('/api/purchase', purchaseRoutes);
 app.use('/api/mobile/customer', mobileCustomerRoutes);
 
 app.use('/api/mobile/worker', mobileWorkerRoutes);
+
+app.use('/api/mobile/supplier', mobileSupplierRoutes);
 
 app.use('/api/waterquality' , waterQualityRoutes);
 

@@ -50,6 +50,7 @@ router.delete('/registered-workers/:id', (req, res) => {
             res.status(404).json({ message: 'Worker not found' });
         } else {
             res.json({ message: 'Worker deleted successfully' });
+            console.log(`Worker with ID ${id} deleted successfully.`);
         }
     });
 });

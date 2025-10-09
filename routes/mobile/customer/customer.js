@@ -6,7 +6,7 @@ const path = require("path");
 const jwt = require("jsonwebtoken");
 const db = require("../../../db"); // MySQL connection
 
-const JWT_SECRET = "your_super_secret_key";
+const JWT_SECRET = process.env.JWT_SECRET || "8f3d2c9b6a1e4f7d9c0b3a6e5d4f1a2b7c9e0d4f6b8a1c3e2f0d9b6a4c8e7f1";
 
 //create nodemailer connection with gmail smtp using .env file credentials.
 const transporter = nodemailer.createTransport({
@@ -30,7 +30,14 @@ const storage = multer.diskStorage({
 });
 
 const fileFilter = (req, file, cb) => {
-  if (file.mimetype === 'application/pdf' || file.mimetype === 'image/jpeg' || file.mimetype === 'image/jpg' || file.mimetype === 'image/png') {
+  // Accept common image/pdf mimetypes. Some clients (mobile browsers or apps)
+  // may send PDFs with 'application/octet-stream' — accept that when the
+  // filename extension indicates a supported type to avoid false rejections.
+  const allowedMimes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'application/octet-stream'];
+  const ext = path.extname(file.originalname || '').toLowerCase();
+  const allowedExts = ['.pdf', '.jpg', '.jpeg', '.png'];
+
+  if (allowedMimes.includes(file.mimetype) && allowedExts.includes(ext)) {
     cb(null, true);
   } else {
     console.log(`Rejected file: ${file.originalname}, mimetype: ${file.mimetype}`);
@@ -41,23 +48,72 @@ const fileFilter = (req, file, cb) => {
 const upload = multer({ storage: storage, fileFilter: fileFilter });
 
 function authenticateCustomer(req, res, next) {
+  // Support Authorization: "Bearer <token>" or raw token in header
+  // Also accept token in body or query for mobile clients that can't set headers
   const authHeader = req.headers.authorization;
-  if (!authHeader) {
-    return res.status(401).json({ error: "Authorization header missing" });
+  let token = null;
+
+  if (authHeader) {
+    const parts = authHeader.split(" ");
+    if (parts.length === 2 && parts[0].toLowerCase() === "bearer") {
+      token = parts[1];
+    } else if (parts.length === 1) {
+      token = parts[0];
+    }
   }
-  const token = authHeader.split(" ")[1];
+
+  if (!token && req.body && req.body.token) {
+    token = req.body.token;
+  }
+
+  if (!token && req.query && req.query.token) {
+    token = req.query.token;
+  }
+
   if (!token) {
+    console.warn('Authentication failed: token missing');
     return res.status(401).json({ error: "Token missing" });
   }
+
   try {
+    // Decode without verifying to inspect header (alg) for diagnostics
+    let decodedHeader = null;
+    try {
+      decodedHeader = jwt.decode(token, { complete: true });
+      if (decodedHeader && decodedHeader.header) {
+        console.info('Incoming JWT alg:', decodedHeader.header.alg, 'kid:', decodedHeader.header.kid || 'none');
+      }
+    } catch (decErr) {
+      console.warn('Failed to decode token for diagnostics:', decErr && decErr.message ? decErr.message : decErr);
+    }
+    
+    // Also decode payload (non-verified) and log a few identifying claims to help debug signature/source
+    try {
+      const decodedPayload = jwt.decode(token) || {};
+      const safeClaims = {
+        iss: decodedPayload.iss,
+        sub: decodedPayload.sub,
+        aud: decodedPayload.aud,
+        role: decodedPayload.role || decodedPayload.user_role || decodedPayload.role_name,
+        id: decodedPayload.id || decodedPayload.user_id || decodedPayload.sub,
+        exp: decodedPayload.exp
+      };
+      console.info('Incoming JWT claims (non-verified):', safeClaims);
+    } catch (decPayErr) {
+      console.warn('Failed to decode JWT payload for diagnostics:', decPayErr && decPayErr.message ? decPayErr.message : decPayErr);
+    }
+
     const decoded = jwt.verify(token, JWT_SECRET);
-    if (decoded.role !== "customer") {
+    if (decoded.role && decoded.role !== "customer") {
+      console.warn('Authentication failed: role mismatch', decoded.role);
       return res.status(403).json({ error: "Access denied" });
     }
     req.user = decoded;
     next();
   } catch (err) {
-    return res.status(401).json({ error: "Invalid token" });
+    console.error('JWT verification error:', err && err.message ? err.message : err);
+    const msg = err && err.name === 'TokenExpiredError' ? 'Token expired' : 'Invalid token';
+    return res.status(401).json({ error: msg });
   }
 }
 
@@ -75,9 +131,9 @@ router.post("/place-order", authenticateCustomer, upload.single('payment_receipt
   }
 
   try {
-    // 2. Fetch customer details from DB
+    // 2. Fetch customer details from DB (keep original column names to avoid confusion)
     const [customerRows] = await db.query(
-      "SELECT customer_id as id, customer_name as name, email FROM customer WHERE customer_id = ?",
+      "SELECT customer_id, customer_name, email FROM customer WHERE customer_id = ?",
       [customer_id]
     );
 
@@ -85,7 +141,7 @@ router.post("/place-order", authenticateCustomer, upload.single('payment_receipt
       return res.status(404).json({ error: "Customer not found" });
     }
 
-    const customer = customerRows[0]; // {id, name, email}
+    const customer = customerRows[0]; // {customer_id, customer_name, email}
 
     // 3. Save order to DB
     const [result] = await db.query(
@@ -106,13 +162,13 @@ router.post("/place-order", authenticateCustomer, upload.single('payment_receipt
 
     const orderId = result.insertId;
 
-    // Send email to admin
+    // Send email to admin (include orderId and use known customer fields)
     await transporter.sendMail({
       from: process.env.EMAIL_USER,
       to: process.env.ADMIN_EMAIL || 'anjulac2006@gmail.com',
       subject: 'New Order Placed',
       text:
-        `New order from ${customer.customer_name} (${customer.email}):\nProduct: ${prawn_type}\nQuantity: ${quantity}\nPrice: ${price}\nLocation: ${location}\nStatus: New\nApproved/Rejected: Pending\nReceipt: ${req.file.filename}`
+        `New order (ID: ${orderId}) from ${customer.customer_name} (${customer.email}):\nProduct: ${prawn_type}\nQuantity: ${quantity}\nPrice: ${price}\nLocation: ${location}\nStatus: New\nApproved/Rejected: Pending\nReceipt filename: ${req.file.filename}`
     });
 
     res.json({ message: "Order placed successfully." });
@@ -150,6 +206,7 @@ router.get("/Order-Status", authenticateCustomer, (req,res) => {
         res.json(results);
     });
 });
+
 
 
 module.exports = router;

@@ -4,7 +4,7 @@ const db = require("../../db");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 
-const JWT_SECRET = "123abc";
+const JWT_SECRET = process.env.JWT_SECRET || "8f3d2c9b6a1e4f7d9c0b3a6e5d4f1a2b7c9e0d4f6b8a1c3e2f0d9b6a4c8e7f1";
 
 /**
  * Generate JWT token
@@ -113,7 +113,6 @@ router.post("/customer-login", (req, res) => {
 
 //worker login
 
-// Worker login
 router.post("/worker-login", (req, res) => {
     const userNameOrEmail = req.body?.userNameOrEmail;
     const password = req.body?.password;
@@ -122,32 +121,37 @@ router.post("/worker-login", (req, res) => {
     const trimmedUserNameOrEmail = userNameOrEmail?.trim();
     const trimmedPassword = password?.trim();
 
+    // 👇 Log in terminal when worker tries to log in
+    console.log(`🧑‍🔧 Worker "${trimmedUserNameOrEmail}" is trying to log in...`);
+
     if (!trimmedUserNameOrEmail || !trimmedPassword) {
+        console.log("❌ Missing username/email or password.");
         return res.status(400).json({ message: "Username/Email and Password are required" });
     }
 
     const sql = "SELECT * FROM worker WHERE (name = ? OR email = ?)";
     db.query(sql, [trimmedUserNameOrEmail, trimmedUserNameOrEmail], async (error, results) => {
         if (error) {
-            console.error("Database error (worker):", error);
+            console.error("🚨 Database error (worker):", error);
             return res.status(500).json({ error: "Database query failed" });
         }
 
         if (results.length > 0) {
             const worker = results[0];
 
-            // Compare hashed password with bcrypt
             const isMatch = await bcrypt.compare(trimmedPassword, worker.password);
             if (!isMatch) {
+                console.log(`⚠️ Worker "${trimmedUserNameOrEmail}" entered an invalid password.`);
                 return res.status(401).json({ message: "Invalid Password" });
             }
 
-            // Generate token with role worker & expiry based on rememberMe
             const token = generateToken(
                 { id: worker.worker_id, name: worker.name, email: worker.email },
                 "worker",
                 rememberMe ? "30d" : "1d"
             );
+
+            console.log(`✅ Worker "${worker.name}" logged in successfully.`);
 
             res.status(200).json({
                 message: "Login successful",
@@ -161,10 +165,12 @@ router.post("/worker-login", (req, res) => {
                 },
             });
         } else {
+            console.log(`❌ Worker "${trimmedUserNameOrEmail}" not found in the database.`);
             res.status(401).json({ message: "Invalid Username or Email" });
         }
     });
 });
+
 
 
 //supplier login

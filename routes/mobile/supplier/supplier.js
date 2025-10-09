@@ -5,7 +5,7 @@ const db = require("../../../db");
 
 //display order details
 router.get('/order-details', (req,res) => {
-  const sql = "SELECT * FROM supply_orders ORDER BY created_at DESC";
+  const sql = "SELECT * FROM supply_orders ORDER BY order_date DESC";
 
   db.query(sql, (err, results) => {
       if (err) {

@@ -5,7 +5,7 @@ const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 const nodemailer = require('nodemailer');
 
-const JWT_SECRET = "your_super_secret_key";
+const JWT_SECRET = process.env.JWT_SECRET || "8f3d2c9b6a1e4f7d9c0b3a6e5d4f1a2b7c9e0d4f6b8a1c3e2f0d9b6a4c8e7f1";
 
 // Generate JWT
 function generateToken(user, role) {
@@ -16,7 +16,7 @@ function generateToken(user, role) {
             email: user.email,
             role: role
         },
-        JWT_SECRET,
+        JWT_SECRET,  
         { expiresIn: "7d" } // Token valid for 7 days
     );
 }

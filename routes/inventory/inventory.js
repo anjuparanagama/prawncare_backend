@@ -5,10 +5,10 @@ const pdf = require('html-pdf'); //use html-pdf to create pdf from html
 
 // Add new inventory items to database
 router.post('/add', (req, res) => {
-    const { itemName, date, qty } = req.body;
+    const { itemName, type, qty } = req.body;
     
     // Input validation
-    if (!itemName || !date || !qty) {
+    if (!itemName || !type || !qty) {
         return res.status(400).json({ 
             success: false, 
             message: "All fields are required" 
@@ -22,9 +22,9 @@ router.post('/add', (req, res) => {
         });
     }
 
-    const sql = 'INSERT INTO inventory (name, date, quantity) VALUES (?, ?, ?)';
+    const sql = 'INSERT INTO inventory (name, type, quantity) VALUES (?, ?, ?)';
     
-    db.query(sql, [itemName, date, parseInt(qty)], (err, result) => {
+    db.query(sql, [itemName, type, parseInt(qty)], (err, result) => {
         if (err) {
             console.error('SQL ERROR:', err);
             return res.status(500).json({ 
