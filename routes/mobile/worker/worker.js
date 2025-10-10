@@ -51,7 +51,7 @@ function authenticateToken(req, res, next) {
 
 //display all approved orders to worker dashboard
 router.get("/New-Orders", async (req,res) => {
-    const sql = "SELECT * FROM customer_order WHERE approved_or_rejected == 'Approved' ORDER BY created_at DESC";
+    const sql = "SELECT * FROM customer_order WHERE approved_or_rejected = 'Approved' ORDER BY created_at DESC";
 
     db.query(sql, (err, results) => {
         if (err) {
@@ -63,7 +63,7 @@ router.get("/New-Orders", async (req,res) => {
 });
 
 //Update order status by worker
-router.patch("/Update-Order-Status", (req,res) => {
+router.patch("/update-order-status", (req,res) => {
     const sql = "UPDATE customer_order SET status = ? WHERE order_id = ?";
 
     db.query(sql, (err, results) => {
@@ -75,7 +75,19 @@ router.patch("/Update-Order-Status", (req,res) => {
     });
 });
 
-//feeding reminder system 
+router.get("/time-table", (req,res) => {
+    const sql = "SELECT * FROM feeding_schedule ORDER BY Pond_ID ASC, feeding_time ASC";
+    db.query(sql, (err, results) => {
+
+        if (err) {
+            console.error('Error fetching feeding schedule: ', err);
+            return res.status(500).json({ error: 'Error fetching feeding schedule' });
+        }
+        res.json(results);
+    });
+});
+
+//feeding reminder system
 let reminders = [];
 
 // Check feeding times every , * - in minute → every minute, * - in hour → every hour, * - in day of month → every day, * -  in month → every month, * - in day of week → every day of week
@@ -87,7 +99,7 @@ cron.schedule("* * * * *", () => {
     .padStart(2, "0")}:00`;
 
   const sql = `
-    SELECT feeding_ID, Pond_ID, feeding_time 
+    SELECT feeding_ID, Pond_ID, feeding_time
     FROM feeding_schedule
     WHERE TIMEDIFF(feeding_time, ?) = '00:15:00'
   `;
@@ -307,7 +319,7 @@ router.get("/tasks", authenticateToken, (req, res) => {
                       return;
                     }
 
-                    // If we reached here, we couldn't determine how to match token to tasks
+                    // If we reached here, we couldn't determine how to match token to tasks rows
                     console.error("Unable to resolve how to match token payload to tasks rows. workerId:", workerId, "emailCol:", emailCol, "workerCol:", workerCol);
                     return res.status(400).json({ error: "Worker identifier not present in token and no suitable column found to match by email" });
           });

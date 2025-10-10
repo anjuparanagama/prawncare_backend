@@ -30,9 +30,6 @@ const storage = multer.diskStorage({
 });
 
 const fileFilter = (req, file, cb) => {
-  // Accept common image/pdf mimetypes. Some clients (mobile browsers or apps)
-  // may send PDFs with 'application/octet-stream' — accept that when the
-  // filename extension indicates a supported type to avoid false rejections.
   const allowedMimes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'application/octet-stream'];
   const ext = path.extname(file.originalname || '').toLowerCase();
   const allowedExts = ['.pdf', '.jpg', '.jpeg', '.png'];
@@ -48,8 +45,7 @@ const fileFilter = (req, file, cb) => {
 const upload = multer({ storage: storage, fileFilter: fileFilter });
 
 function authenticateCustomer(req, res, next) {
-  // Support Authorization: "Bearer <token>" or raw token in header
-  // Also accept token in body or query for mobile clients that can't set headers
+
   const authHeader = req.headers.authorization;
   let token = null;
 
