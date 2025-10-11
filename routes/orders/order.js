@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const db = require("../../db");
 const path = require("path");
+const fs = require("fs");
 
 router.get('/order-table', (req, res) => {
     const query = `
@@ -339,14 +340,32 @@ router.get('/order/:id/receipt', (req, res) => {
         } else if (result.length === 0 || !result[0].payment_receipt) {
             res.status(404).json({ error: 'Receipt not found' });
         } else {
-            const receiptPath = result[0].payment_receipt;
-            const fullPath = path.join(__dirname, '../../uploads', receiptPath);
-            res.sendFile(fullPath, (err) => {
-                if (err) {
-                    console.error('Error sending file:', err);
-                    res.status(500).json({ error: 'Error downloading receipt' });
+                const receiptPath = result[0].payment_receipt || '';
+
+                // Resolve full path safely to avoid duplicated 'uploads/uploads' when
+                // DB stores a path like 'uploads/filename.ext'. Also handle absolute paths.
+                let fullPath;
+                if (path.isAbsolute(receiptPath)) {
+                    fullPath = receiptPath;
+                } else if (receiptPath.startsWith('uploads/') || receiptPath.startsWith('uploads\\')) {
+                    fullPath = path.join(__dirname, '../../', receiptPath);
+                } else {
+                    fullPath = path.join(__dirname, '../../uploads', receiptPath);
                 }
-            });
+
+                // Normalize and check file existence before sending
+                fullPath = path.normalize(fullPath);
+                if (!fs.existsSync(fullPath)) {
+                    console.error('Receipt file not found:', fullPath);
+                    return res.status(404).json({ error: 'Receipt file not found' });
+                }
+
+                res.sendFile(fullPath, (err) => {
+                    if (err) {
+                        console.error('Error sending file:', err);
+                        res.status(500).json({ error: 'Error downloading receipt' });
+                    }
+                });
         }
     });
 });

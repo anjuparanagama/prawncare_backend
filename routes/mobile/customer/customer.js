@@ -22,7 +22,8 @@ const transporter = nodemailer.createTransport({
 // Multer setup for file uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, 'uploads/');
+    const uploadDir = path.join(__dirname, '../../../uploads/');
+    cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
     cb(null, Date.now() + path.extname(file.originalname));
@@ -128,7 +129,7 @@ router.post("/place-order", authenticateCustomer, upload.single('payment_receipt
 
   try {
     // 2. Fetch customer details from DB (keep original column names to avoid confusion)
-    const [customerRows] = await db.query(
+    const [customerRows] = await db.promise().query(
       "SELECT customer_id, customer_name, email FROM customer WHERE customer_id = ?",
       [customer_id]
     );
@@ -140,19 +141,17 @@ router.post("/place-order", authenticateCustomer, upload.single('payment_receipt
     const customer = customerRows[0]; // {customer_id, customer_name, email}
 
     // 3. Save order to DB
-    const [result] = await db.query(
-      "INSERT INTO orders (customer_id, name, email, product, quantity, price, status, approved_or_rejected, payment_receipt_path, location) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    const [result] = await db.promise().query(
+      "INSERT INTO customer_order (customer_id, address, prawn_type, quantity, payment_receipt, approved_or_rejected, status, price) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
       [
         customer.customer_id,
-        customer.customer_name,
-        customer.email,
+        location,
         prawn_type,
         quantity,
-        price,
+        `uploads/${req.file.filename}`,
+        null,
         "New",
-        "Pending",
-        req.file.path,
-        location
+        price
       ]
     );
 

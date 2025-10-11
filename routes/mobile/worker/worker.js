@@ -64,9 +64,15 @@ router.get("/New-Orders", async (req,res) => {
 
 //Update order status by worker
 router.patch("/update-order-status", (req,res) => {
+    const { order_id, status } = req.body;
+
+    if (!order_id || !status) {
+        return res.status(400).json({ error: 'Order ID and status are required' });
+    }
+
     const sql = "UPDATE customer_order SET status = ? WHERE order_id = ?";
 
-    db.query(sql, (err, results) => {
+    db.query(sql, [status, order_id], (err, results) => {
         if (err) {
             console.error('Error updating order status: ', err);
             return res.status(500).json({ error: 'Error updating order status' });
@@ -87,7 +93,7 @@ router.get("/time-table", (req,res) => {
     });
 });
 
-//feeding reminder system
+//feeding reminder system 
 let reminders = [];
 
 // Check feeding times every , * - in minute → every minute, * - in hour → every hour, * - in day of month → every day, * -  in month → every month, * - in day of week → every day of week
@@ -99,7 +105,7 @@ cron.schedule("* * * * *", () => {
     .padStart(2, "0")}:00`;
 
   const sql = `
-    SELECT feeding_ID, Pond_ID, feeding_time
+    SELECT feeding_ID, Pond_ID, feeding_time 
     FROM feeding_schedule
     WHERE TIMEDIFF(feeding_time, ?) = '00:15:00'
   `;
@@ -319,7 +325,7 @@ router.get("/tasks", authenticateToken, (req, res) => {
                       return;
                     }
 
-                    // If we reached here, we couldn't determine how to match token to tasks rows
+                    // If we reached here, we couldn't determine how to match token to tasks
                     console.error("Unable to resolve how to match token payload to tasks rows. workerId:", workerId, "emailCol:", emailCol, "workerCol:", workerCol);
                     return res.status(400).json({ error: "Worker identifier not present in token and no suitable column found to match by email" });
           });

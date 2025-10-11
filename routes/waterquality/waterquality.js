@@ -1,39 +1,8 @@
 const express = require("express");
-const fetch = require("node-fetch");
 const cron = require("node-cron");
 const router = express.Router();
 const db = require("../../db");
 const pdf = require('html-pdf');
-
-//Save ESP data to mysql DB every 6 hour by cron job
-const ESP_IP = "";
-
-async function saveSensorsData () {
-    try {
-        const response = await fetch(`http://${ESP_IP}/data`);
-        const data = await response.json();
-
-        const sql = 'INSERT INTO sensors_data (Pond_ID, WaterTemp, pH, TDS, Water_Level) VALUES (?, ?, ?, ?, ?)';
-
-        const values = [1, data.waterTemp, data.ph, data.tds, data.waterlevel]; // Assuming pond_id = 1
-
-        db.query(sql, values, (err, result) => {
-            if (err) {
-                console.error('Error inserting data: ', err);
-            } else {
-                console.log('Data inserted successfully');
-            }
-        });
-    } catch (error) {
-        console.error('Error fetching sensor data: ', error);
-    }
-}
-
-cron.schedule('0 */6 * * *', () => {
-    console.log("Scheduled Task Running for Sensors Data...")
-    saveSensorsData();
-});
-
 
 //Save ESP pH Data to mysql DB every 6 hour by cron job
 const ESP_IP_Ph = "10.194.157.245";
