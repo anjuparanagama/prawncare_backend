@@ -4,7 +4,11 @@ const nodemailer = require("nodemailer");
 const multer = require("multer");
 const path = require("path");
 const jwt = require("jsonwebtoken");
+const bcrypt = require("bcrypt");
+const crypto = require("crypto");
 const db = require("../../../db"); // MySQL connection
+
+const resetTokens = new Map();
 
 const JWT_SECRET = process.env.JWT_SECRET || "8f3d2c9b6a1e4f7d9c0b3a6e5d4f1a2b7c9e0d4f6b8a1c3e2f0d9b6a4c8e7f1";
 
@@ -175,7 +179,7 @@ router.post("/place-order", authenticateCustomer, upload.single('payment_receipt
 
 
 router.get("/available-prawn-types" , (req,res) => {
-    const sql = "SELECT DISTINCT name FROM inventory WHERE quantity > 10 AND category = 'Prawns'";
+    const sql = "SELECT DISTINCT name FROM inventory WHERE quantity > 10 AND type = 'prawns'";
 
     db.query(sql, (err, results) => {
         if (err) {
@@ -191,7 +195,7 @@ router.get("/available-prawn-types" , (req,res) => {
 router.get("/Order-Status", authenticateCustomer, (req,res) => {
     const customer_id = req.user.id;
 
-    const sql = "SELECT order_id, product, quantity, price, status, approved_or_rejected, created_at, updated_at FROM orders WHERE customer_id = ? ORDER BY created_at DESC";
+    const sql = "SELECT order_id, prawn_type, quantity, price, status, approved_or_rejected, created_at, updated_at FROM customer_order WHERE customer_id = ? ORDER BY created_at DESC";
 
     db.query(sql, [customer_id], (err, results) => {
         if (err) {
@@ -202,6 +206,117 @@ router.get("/Order-Status", authenticateCustomer, (req,res) => {
     });
 });
 
+// Forgot Password: Request reset token via email
+router.post("/forgot-password", async (req, res) => {
+  const { email } = req.body;
 
+  if (!email) {
+    return res.status(400).json({ error: "Email is required" });
+  }
+
+  try {
+    const [customerRows] = await db.promise().query(
+      "SELECT customer_id, email FROM customer WHERE email = ?",
+      [email]
+    );
+
+    if (customerRows.length === 0) {
+      return res.json({ message: "If an account with that email exists, reset instructions have been sent." });
+    }
+
+    const customer = customerRows[0];
+
+    // Generate 5-character reset token
+    const resetToken = crypto.randomBytes(3).toString('hex').substring(0, 5).toUpperCase();
+
+    // Store token with customer_id (expires in 1 hour)
+    resetTokens.set(resetToken, { customerId: customer.customer_id, expires: Date.now() + 3600000 });
+
+    // Send email with reset token
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: customer.email,
+      subject: 'Password Reset Request',
+      text: `You requested a password reset. Use this token to reset your password: ${resetToken}\n\nThis token expires in 1 hour. If you did not request this, please ignore this email.`
+    });
+
+    res.json({ message: "If an account with that email exists, reset instructions have been sent." });
+  } catch (err) {
+    console.error("Error in forgot-password:", err);
+    res.status(500).json({ error: "Something went wrong." });
+  }
+});
+
+// Reset Password: Use token to set new password
+router.post("/reset-password", async (req, res) => {
+  const { token, newPassword } = req.body;
+
+  if (!token || !newPassword) {
+    return res.status(400).json({ error: "Token and new password are required" });
+  }
+
+  try {
+    // Check if token exists in Map
+    const tokenData = resetTokens.get(token);
+    if (!tokenData) {
+      return res.status(400).json({ error: "Invalid reset token." });
+    }
+
+    // Check if token has expired
+    if (Date.now() > tokenData.expires) {
+      resetTokens.delete(token);
+      return res.status(400).json({ error: "Reset token has expired." });
+    }
+
+    const customerId = tokenData.customerId;
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    await db.promise().query(
+      "UPDATE customer SET password = ? WHERE customer_id = ?",
+      [hashedPassword, customerId]
+    );
+
+    // Remove token after successful reset
+    resetTokens.delete(token);
+
+    res.json({ message: "Password reset successfully." });
+  } catch (err) {
+    console.error("Error in reset-password:", err);
+    res.status(500).json({ error: "Something went wrong." });
+  }
+});
+
+// Send notification to customer when order status is updated by worker
+router.get("/send-order-update-notification", async (req, res) => {
+  const { order_id } = req.query;
+
+  if (!order_id) {
+    return res.status(400).json({ error: "Order ID is required" });
+  }
+
+  try {
+    const [orderRows] = await db.promise().query(
+      `SELECT co.order_id, co.prawn_type, co.quantity, co.price, co.status, co.approved_or_rejected, co.created_at, co.updated_at, c.email, c.customer_name
+       FROM customer_order co
+       JOIN customer c ON co.customer_id = c.customer_id
+       WHERE co.order_id = ?`,
+      [order_id]
+    );
+
+    if (orderRows.length === 0) {
+      return res.status(404).json({ error: "Order not found" });
+    }
+
+    const order = orderRows[0];
+
+    // Return notification message as JSON
+    const notificationMessage = `Dear ${order.customer_name},\n\nYour order (ID: ${order.order_id}) status has been updated.\n\nDetails:\n- Product: ${order.prawn_type}\n- Quantity: ${order.quantity}\n- Price: ${order.price}\n- Status: ${order.status}\n- Approved/Rejected: ${order.approved_or_rejected || 'N/A'}\n- Created At: ${order.created_at}\n- Updated At: ${order.updated_at}\n\nThank you for your business!\n\nBest regards,\nPrawnCare Team`;
+
+    res.json({ message: notificationMessage });
+  } catch (err) {
+    console.error("Error in send-order-update-notification:", err);
+    res.status(500).json({ error: "Something went wrong." });
+  }
+});
 
 module.exports = router;

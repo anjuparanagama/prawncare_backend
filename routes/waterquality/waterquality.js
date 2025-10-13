@@ -9,12 +9,19 @@ const ESP_IP_Ph = "10.194.157.245";
 
 async function saveSensorsData () {
     try {
-        const response = await fetch(`http://${ESP_IP_Ph}/pH`);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
+        const response = await fetch(`http://${ESP_IP_Ph}/pH`, {
+            signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
         const data = await response.json();
 
         const sql = 'INSERT INTO sensors_data (Pond_ID, pH) VALUES (?, ?)';
 
-        const values = [1, data.ph]; // Assuming pond_id = 1
+        const values = [1, data.ph];
 
         db.query(sql, values, (err, result) => {
             if (err) {
@@ -24,7 +31,11 @@ async function saveSensorsData () {
             }
         });
     } catch (error) {
-        console.error('Error fetching sensor data: ', error);
+        if (error.name === 'AbortError') {
+            console.error('Fetch request timed out after 30 seconds');
+        } else {
+            console.error('Error fetching sensor data: ', error);
+        }
     }
 }
 
@@ -190,5 +201,6 @@ router.get('/downloadpdf', (req,res) => {
               });
   });
 });
+
 
 module.exports= router;

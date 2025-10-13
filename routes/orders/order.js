@@ -3,6 +3,18 @@ const router = express.Router();
 const db = require("../../db");
 const path = require("path");
 const fs = require("fs");
+const nodemailer = require('nodemailer');
+
+// Configure Nodemailer transporter
+const transporter = nodemailer.createTransport({
+    host: process.env.EMAIL_HOST || 'smtp.gmail.com',
+    port: 587,
+    secure: false,
+    auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+    }
+});
 
 router.get('/order-table', (req, res) => {
     const query = `
@@ -324,7 +336,39 @@ router.patch('/order/:id/approve_reject', (req, res) => {
         if (result.affectedRows === 0) {
             return res.status(404).json({ error: 'Order not found' });
         }
-        res.json({ message: `Order ${action} successfully` });
+
+        // Fetch the customer's email
+        const emailQuery = `SELECT c.email FROM customer_order o JOIN customer c ON o.customer_id = c.customer_id WHERE o.order_id = ?`;
+        db.query(emailQuery, [orderId], (err2, result2) => {
+            if (err2) {
+                console.error('Error fetching email:', err2);
+                return res.json({ message: `Order ${action} successfully` });
+            }
+            if (result2.length === 0 || !result2[0].email) {
+                console.log('No email found for order', orderId);
+                return res.json({ message: `Order ${action} successfully` });
+            }
+
+            const customerEmail = result2[0].email;
+
+            // Send email notification
+            const mailOptions = {
+                from: process.env.EMAIL_USER,
+                to: customerEmail,
+                subject: 'Order Approval Update',
+                text: `Your order #${orderId} has been ${action.toLowerCase()}. Thank you for your business!`
+            };
+
+            transporter.sendMail(mailOptions, (err3, info) => {
+                if (err3) {
+                    console.error('Error sending email:', err3);
+                } else {
+                    console.log('Email sent:', info.response);
+                }
+                // Always return success for approval update
+                res.json({ message: `Order ${action} successfully` });
+            });
+        });
     });
 });
 
@@ -393,6 +437,62 @@ router.patch('/order/:id/receipt/Assign-By', (req,res) =>{
             return res.status(404).json({ error: 'Order not found' });
         }
         res.json({ message: 'Assigned By updated successfully' });
+    });
+});
+
+// PATCH endpoint to update order status and send email notification
+router.patch('/order/:id/status', (req, res) => {
+    const orderId = req.params.id;
+    const { status } = req.body;
+
+    if (!status) {
+        return res.status(400).json({ error: 'Status is required' });
+    }
+
+    // Update the order status in the database
+    const updateQuery = `UPDATE customer_order SET status = ? WHERE order_id = ?`;
+    db.query(updateQuery, [status, orderId], (err, result) => {
+        if (err) {
+            console.error('Error updating status:', err);
+            return res.status(500).json({ error: 'Error updating status' });
+        }
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: 'Order not found' });
+        }
+
+        // Fetch the customer's email
+        const emailQuery = `SELECT c.email FROM customer_order o JOIN customer c ON o.customer_id = c.customer_id WHERE o.order_id = ?`;
+        db.query(emailQuery, [orderId], (err2, result2) => {
+            if (err2) {
+                console.error('Error fetching email:', err2);
+                // Still return success, but log error
+                return res.json({ message: 'Status updated successfully' });
+            }
+            if (result2.length === 0 || !result2[0].email) {
+                console.log('No email found for order', orderId);
+                return res.json({ message: 'Status updated successfully' });
+            }
+
+            const customerEmail = result2[0].email;
+
+            // Send email notification
+            const mailOptions = {
+                from: process.env.EMAIL_USER,
+                to: customerEmail,
+                subject: 'Order Status Update',
+                text: `Your order #${orderId} status has been updated to: ${status}. Thank you for your business!`
+            };
+
+            transporter.sendMail(mailOptions, (err3, info) => {
+                if (err3) {
+                    console.error('Error sending email:', err3);
+                } else {
+                    console.log('Email sent:', info.response);
+                }
+                // Always return success for status update
+                res.json({ message: 'Status updated successfully' });
+            });
+        });
     });
 });
 
