@@ -16,3 +16,9 @@
 # TODO for Modifying /update-order-status Email Recipient
 
 - [x] Modify the `/update-order-status` endpoint in `backend/routes/mobile/supplier/supplier.js` to send email to 'anjula@gmail.com' instead of fetching manager's email from database.
+
+# TODO: Fix /tasks API to properly handle req.user.id from decoded token
+
+- [x] Add console logging for req.user object in /tasks route for debugging
+- [x] Add check for req.user.id presence and validity in /tasks route; return 400 error if missing/invalid
+- [ ] Modify /tasks route to fetch worker_id from database using req.user.email since id is missing in token
