@@ -4,6 +4,7 @@ const router = express.Router();
 const cron = require("node-cron");
 const db = require("../../../db");
 const jwt = require("jsonwebtoken");
+const nodemailer = require("nodemailer");
 const JWT_SECRET = process.env.JWT_SECRET || "8f3d2c9b6a1e4f7d9c0b3a6e5d4f1a2b7c9e0d4f6b8a1c3e2f0d9b6a4c8e7f1";
 
 function authenticateToken(req, res, next) {
@@ -75,6 +76,30 @@ router.patch("/update-order-status", (req,res) => {
             console.error('Error updating order status: ', err);
             return res.status(500).json({ error: 'Error updating order status' });
         }
+
+        // Send email notification
+        const transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: {
+                user: process.env.EMAIL_USER,
+                pass: process.env.EMAIL_PASS
+            }
+        });
+
+        const mailOptions = {
+            from: process.env.EMAIL_USER,
+            to: 'anjulac2006@gmail.com',
+            subject: 'Order Status Updated',
+            text: `Order ID: ${order_id}\nStatus: ${status}`
+        };
+
+        transporter.sendMail(mailOptions, (error, info) => {
+            if (error) {
+                console.error('Error sending email: ', error);
+            } else {
+                console.log('Email sent: ' + info.response);
+            }
+        });
 
         res.json({
             message: 'Order status updated successfully',

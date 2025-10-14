@@ -4,8 +4,9 @@ const router = express.Router();
 const db = require("../../db");
 const pdf = require('html-pdf');
 
+
 //Save ESP pH Data to mysql DB every 6 hour by cron job
-const ESP_IP_Ph = "10.194.157.245";
+const ESP_IP_Ph = "192.168.1.113";
 
 async function saveSensorsData () {
     try {
@@ -240,6 +241,5 @@ router.get('/downloadpdf', (req,res) => {
               });
   });
 });
-
 
 module.exports= router;
