@@ -112,7 +112,7 @@ cron.schedule("* * * * *", () => {
   const sql = `
     SELECT feeding_ID, Pond_ID, feeding_time 
     FROM feeding_schedule
-    WHERE TIMEDIFF(feeding_time, ?) = '00:15:00'
+    WHERE TIMEDIFF(feeding_time, ?) <= '00:15:00'
   `;
 
   db.query(sql, [currentTime], (err, results) => {

@@ -39,6 +39,45 @@ async function saveSensorsData () {
     }
 }
 
+const ESP_IP = "10.194.157.245";
+
+async function saveSensors () {
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
+        const response = await fetch(`http://${ESP_IP}/sensors`, {
+            signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
+        const data = await response.json();
+
+        const sql = 'INSERT INTO sensors_data (Pond_ID, water_level, temperature, tds ) VALUES (?, ?, ?, ?)';
+
+        const values = [1, data.ph];
+
+        db.query(sql, values, (err, result) => {
+            if (err) {
+                console.error('Error inserting data: ', err);
+            } else {
+                console.log('Data inserted successfully');
+            }
+        });
+    } catch (error) {
+        if (error.name === 'AbortError') {
+            console.error('Fetch request timed out after 30 seconds');
+        } else {
+            console.error('Error fetching sensor data: ', error);
+        }
+    }
+}
+
+cron.schedule('0 */6 * * *', () => {
+    console.log("Scheduled Task Running for Sensors Data...")
+    saveSensors();
+});
+
 cron.schedule('0 */6 * * *', () => {
     console.log("Scheduled Task Running for Sensors Data...")
     saveSensorsData();
@@ -71,15 +110,15 @@ router.get('/sensor-data', (req, res) => {
 
 // Helper SQL: latest record per pond
 const baseQuery = `
-  SELECT s.Pond_ID, s.Water_Level, s.pH, s.WaterTemp, s.TDS
-  FROM sensors_data s
-  INNER JOIN (
-    SELECT Pond_ID, MAX(Updated_at) AS latest_time
-    FROM sensors_data
-    GROUP BY Pond_ID
-  ) latest
-  ON s.Pond_ID = latest.Pond_ID AND s.Updated_at = latest.latest_time
-`; 
+                    SELECT s.Pond_ID, s.Water_Level, s.pH, s.WaterTemp, s.TDS
+                    FROM sensors_data s
+                    INNER JOIN (
+                        SELECT Pond_ID, MAX(Updated_at) AS latest_time
+                        FROM sensors_data
+                        GROUP BY Pond_ID
+                    ) latest
+                    ON s.Pond_ID = latest.Pond_ID AND s.Updated_at = latest.latest_time
+                `; 
 
 // Average Water Level
 router.get("/average-water-level", (req, res) => {
