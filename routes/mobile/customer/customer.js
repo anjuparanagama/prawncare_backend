@@ -132,7 +132,6 @@ router.post("/place-order", authenticateCustomer, upload.single('payment_receipt
   }
 
   try {
-    // 2. Fetch customer details from DB (keep original column names to avoid confusion)
     const [customerRows] = await db.promise().query(
       "SELECT customer_id, customer_name, email FROM customer WHERE customer_id = ?",
       [customer_id]
@@ -142,9 +141,8 @@ router.post("/place-order", authenticateCustomer, upload.single('payment_receipt
       return res.status(404).json({ error: "Customer not found" });
     }
 
-    const customer = customerRows[0]; // {customer_id, customer_name, email}
+    const customer = customerRows[0];
 
-    // 3. Save order to DB
     const [result] = await db.promise().query(
       "INSERT INTO customer_order (customer_id, address, prawn_type, quantity, payment_receipt, approved_or_rejected, status, price) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
       [
@@ -161,7 +159,6 @@ router.post("/place-order", authenticateCustomer, upload.single('payment_receipt
 
     const orderId = result.insertId;
 
-    // Send email to admin (include orderId and use known customer fields)
     await transporter.sendMail({
       from: process.env.EMAIL_USER,
       to: process.env.ADMIN_EMAIL || 'anjulac2006@gmail.com',

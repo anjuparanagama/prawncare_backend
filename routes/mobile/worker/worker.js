@@ -1,3 +1,4 @@
+module.exports = (io) => {
 const express = require("express");
 const router = express.Router();
 const cron = require("node-cron");
@@ -98,10 +99,9 @@ router.get("/time-table", (req,res) => {
     });
 });
 
-//feeding reminder system 
 let reminders = [];
 
-// Check feeding times every , * - in minute → every minute, * - in hour → every hour, * - in day of month → every day, * -  in month → every month, * - in day of week → every day of week
+// Cron job runs every minute
 cron.schedule("* * * * *", () => {
   const now = new Date();
   const currentTime = `${now.getHours().toString().padStart(2, "0")}:${now
@@ -110,32 +110,66 @@ cron.schedule("* * * * *", () => {
     .padStart(2, "0")}:00`;
 
   const sql = `
-    SELECT feeding_ID, Pond_ID, feeding_time 
+    SELECT feeding_ID, Pond_ID, feeding_time
     FROM feeding_schedule
-    WHERE TIMEDIFF(feeding_time, ?) <= '00:15:00'
+    WHERE feeding_time BETWEEN ? AND ADDTIME(?, '00:15:00')
   `;
 
-  db.query(sql, [currentTime], (err, results) => {
+  db.query(sql, [currentTime, currentTime], (err, results) => {
     if (err) {
       console.error("Error checking reminders:", err);
     } else if (results.length > 0) {
       results.forEach((row) => {
-        const reminder = {
-          feeding_ID: row.feeding_ID,
-          pond_ID: row.Pond_ID,
-          reminder_time: currentTime,
-          message: `Feeding reminder: Pond ${row.Pond_ID} needs feeding at ${row.feeding_time}`
-        };
-        reminders.push(reminder);
-        console.log("Reminder created:", reminder);
+        // Prevent duplicate reminders
+        const exists = reminders.some(
+          (rem) => rem.feeding_ID === row.feeding_ID
+        );
+
+        if (!exists) {
+          const reminder = {
+            feeding_ID: row.feeding_ID,
+            pond_ID: row.Pond_ID,
+            reminder_time: currentTime,
+            message: `Feeding reminder: Pond ${row.Pond_ID} needs feeding at ${row.feeding_time}`,
+            acknowledged: false, // new flag
+          };
+
+          reminders.push(reminder);
+          console.log("Reminder created:", reminder);
+
+          // Send to all connected clients
+          io.emit("feeding-reminder", reminder);
+        }
       });
     }
   });
 });
 
-router.get("/reminders", (req, res) => {
+// API to get all current reminders
+router.get("/reminder", (req, res) => {
   res.json(reminders);
-  reminders = [];
+});
+
+// API to acknowledge a reminder (clear after feeding is done)
+router.post("/acknowledge", (req, res) => {
+  const { feeding_ID } = req.body;
+
+  if (!feeding_ID) {
+    return res.status(400).json({ error: "feeding_ID is required" });
+  }
+
+  reminders = reminders.filter((rem) => rem.feeding_ID !== feeding_ID);
+
+  res.json({ success: true, message: `Reminder ${feeding_ID} acknowledged` });
+});
+
+// Socket.IO connection setup
+io.on("connection", (socket) => {
+  console.log("New client connected");
+
+  socket.on("disconnect", () => {
+    console.log("Client disconnected");
+  });
 });
 
 router.get("/tasks", authenticateToken, (req, res) => {
@@ -166,6 +200,5 @@ router.get("/tasks", authenticateToken, (req, res) => {
 });
 
 
-
-
-module.exports = router;
+return router;
+};

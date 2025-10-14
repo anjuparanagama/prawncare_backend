@@ -1,7 +1,20 @@
 const express = require("express");
 const router = express.Router();
-const db = require("../../../db"); 
+const db = require("../../../db");
 const nodemailer = require('nodemailer');
+const crypto = require('crypto');
+const bcrypt = require('bcrypt');
+const resetTokens = new Map();
+
+const transporter = nodemailer.createTransport({
+  host: process.env.EMAIL_HOST || 'smtp.gmail.com',
+  port: process.env.EMAIL_PORT || 587,
+  secure: false,
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS
+  }
+});
 
 //display order details
 router.get('/order-details', (req,res) => {
@@ -121,5 +134,83 @@ router.get('/supply-orders', (req, res) => {
   });
 });
 
+// Forgot Password: Request reset token via email
+router.post("/forgot-password", async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ error: "Email is required" });
+  }
+
+  try {
+    const [customerRows] = await db.promise().query(
+      "SELECT supplier_id, email FROM supplier WHERE email = ?",
+      [email]
+    );
+
+    if (customerRows.length === 0) {
+      return res.json({ message: "If an account with that email exists, reset instructions have been sent." });
+    }
+
+    const customer = customerRows[0];
+
+    // Generate 5-character reset token
+    const resetToken = crypto.randomBytes(3).toString('hex').substring(0, 5).toUpperCase();
+
+    resetTokens.set(resetToken, { customerId: customer.supplier_id, expires: Date.now() + 3600000 });
+
+    // Send email with reset token
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: customer.email,
+      subject: 'Password Reset Request',
+      text: `You requested a password reset. Use this token to reset your password: ${resetToken}\n\nThis token expires in 1 hour. If you did not request this, please ignore this email.`
+    });
+
+    res.json({ message: "If an account with that email exists, reset instructions have been sent." });
+  } catch (err) {
+    console.error("Error in forgot-password:", err);
+    res.status(500).json({ error: "Something went wrong." });
+  }
+});
+
+// Reset Password: Use token to set new password
+router.post("/reset-password", async (req, res) => {
+  const { token, newPassword } = req.body;
+
+  if (!token || !newPassword) {
+    return res.status(400).json({ error: "Token and new password are required" });
+  }
+
+  try {
+    // Check if token exists in Map
+    const tokenData = resetTokens.get(token);
+    if (!tokenData) {
+      return res.status(400).json({ error: "Invalid reset token." });
+    }
+
+    // Check if token has expired
+    if (Date.now() > tokenData.expires) {
+      resetTokens.delete(token);
+      return res.status(400).json({ error: "Reset token has expired." });
+    }
+
+    const customerId = tokenData.customerId;
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    await db.promise().query(
+      "UPDATE supplier SET password = ? WHERE supplier_id = ?",
+      [hashedPassword, customerId]
+    );
+
+    // Remove token after successful reset
+    resetTokens.delete(token);
+
+    res.json({ message: "Password reset successfully." });
+  } catch (err) {
+    console.error("Error in reset-password:", err);
+    res.status(500).json({ error: "Something went wrong." });
+  }
+});
 
 module.exports = router;
