@@ -224,57 +224,88 @@ router.get('/downloadpdf', (req,res) => {
 });
 
 // ✅ Function to check pond conditions
-function checkConditionsAndSendAlert() {
-  // 1️⃣ Get latest pond data
-  db.query("SELECT * FROM sensors_data ORDER BY id DESC LIMIT 1", (err, pondResult) => {
-    if (err || pondResult.length === 0) return console.error(err);
+async function checkConditionsAndSendAlert() {
+  try {
+    // 1️⃣ Fetch real-time data from ESP API
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
-    const pond = pondResult[0];
+    const response = await fetch(`http://${ESP_IP}/sensors`, {
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+    }
+
+    const espData = await response.json();
+
+    // Map ESP data to pond object
+    const pond = {
+      Water_Level: espData.waterLevelInside,
+      WaterTemp: espData.waterTemp,
+      TDS: espData.tds
+    };
 
     // 2️⃣ Get threshold values
-    db.query("SELECT * FROM thresholds LIMIT 1", (err, thresholdResult) => {
-      if (err || thresholdResult.length === 0) return console.error(err);
+    const thresholdResult = await db.promise().query("SELECT * FROM thresholds LIMIT 1");
+    if (thresholdResult[0].length === 0) {
+      console.error("No thresholds found");
+      return;
+    }
 
-      const t = thresholdResult[0];
+    const t = thresholdResult[0][0];
 
-      // 3️⃣ Check each condition
-      let alerts = [];
+    // 3️⃣ Check each condition (skip pH as it's not in ESP data)
+    let alerts = [];
 
-      if (pond.pH < t.min_ph || pond.pH > t.max_ph)
-        alerts.push(`⚠️ pH level out of range: ${pond.pH}`);
+    if (pond.Water_Level < t.min_water_level || pond.Water_Level > t.max_water_level)
+      alerts.push(`⚠️ Water level out of range: ${pond.Water_Level}`);
 
-      if (pond.Water_Level < t.min_water_level || pond.Water_Level > t.max_water_level)
-        alerts.push(`⚠️ Water level out of range: ${pond.Water_Level}`);
+    if (pond.WaterTemp < t.min_temperature || pond.WaterTemp > t.max_temperature)
+      alerts.push(`⚠️ Temperature out of range: ${pond.WaterTemp}`);
 
-      if (pond.WaterTemp < t.min_temperature || pond.WaterTemp > t.max_temperature)
-        alerts.push(`⚠️ Temperature out of range: ${pond.WaterTemp}`);
+    if (pond.TDS < t.min_tds || pond.TDS > t.max_tds)
+      alerts.push(`⚠️ TDS out of range: ${pond.TDS}`);
 
-      if (pond.TDS < t.min_tds || pond.TDS > t.max_tds)
-        alerts.push(`⚠️ TDS out of range: ${pond.TDS}`);
+    // 4️⃣ If any alerts, fetch worker emails and send email
+    if (alerts.length > 0) {
+      const message = alerts.join("\n");
 
-      // 4️⃣ If any alerts, send email
-      if (alerts.length > 0) {
-        const message = alerts.join("\n");
+      // Fetch all worker emails
+      const workerResult = await db.promise().query("SELECT email FROM worker");
+      const workerEmails = workerResult[0].map(row => row.email);
 
-        const mailOptions = {
-          from: process.env.EMAIL_USER,
-          to: process.env.ALERT_EMAIL || process.env.EMAIL_USER,
-          subject: "🚨 Pond Condition Alert",
-          text: message
-        };
-
-        transporter.sendMail(mailOptions, (error, info) => {
-          if (error) {
-            console.error("Email send failed:", error);
-          } else {
-            console.log("✅ Alert email sent:", info.response);
-          }
-        });
-      } else {
-        console.log("✅ All conditions normal.");
+      if (workerEmails.length === 0) {
+        console.error("No worker emails found to send alerts");
+        return;
       }
-    });
-  });
+
+      const mailOptions = {
+        from: process.env.EMAIL_USER,
+        to: workerEmails.join(', '),
+        subject: "🚨 Pond Condition Alert",
+        text: message
+      };
+
+      transporter.sendMail(mailOptions, (error, info) => {
+        if (error) {
+          console.error("Email send failed:", error);
+        } else {
+          console.log("✅ Alert email sent to all workers:", info.response);
+        }
+      });
+    } else {
+      console.log("✅ All conditions normal.");
+    }
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      console.error('Fetch request timed out after 30 seconds');
+    } else {
+      console.error('Error fetching sensor data for alerts:', error);
+    }
+  }
 }
 
 
