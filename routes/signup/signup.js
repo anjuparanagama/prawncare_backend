@@ -80,9 +80,8 @@ router.post("/customer-signup", async (req, res) => {
 Welcome to PrawnCare! Your account has been created successfully.
 
 Username: ${trimmedName}
-Password: ${trimmedPassword}
 
-Please login using these credentials and keep them safe.
+Please login using your email and password. Keep your credentials safe.
 
 Best regards,
 PrawnCare Team`
@@ -150,10 +149,58 @@ router.post("/supplier-signup", async (req, res) => {
             const user = { id: result.insertId, name, email };
             const token = generateToken(user, "supplier");
 
-            res.status(201).json({
-                message: "Supplier registered successfully",
-                token,
-                user
+            // Configure Nodemailer
+            let transporter = nodemailer.createTransport({
+                host: 'smtp.gmail.com',
+                port: 587,
+                secure: false, // use TLS
+                auth: {
+                    user: process.env.EMAIL_USER, // store in .env for security
+                    pass: process.env.EMAIL_PASS
+                },
+                tls: {
+                    rejectUnauthorized: false
+                }
+            });
+
+            // Email content
+            let mailOptions = {
+                from: process.env.EMAIL_USER,
+                to: trimmedEmail,
+                subject: 'Welcome to PrawnCare!',
+                text: `Hello ${trimmedName},
+
+Welcome to PrawnCare! Your supplier account has been created successfully.
+
+Username: ${trimmedName}
+
+Please login using your email and password. Keep your credentials safe.
+
+Best regards,
+PrawnCare Team`
+            };
+
+            // Send email
+            transporter.sendMail(mailOptions, (err, info) => {
+                if (err) {
+                    console.error('Email send error details:', {
+                        code: err.code,
+                        errno: err.errno,
+                        syscall: err.syscall,
+                        hostname: err.hostname,
+                        message: err.message,
+                        stack: err.stack
+                    });
+                    // Still return success even if email fails
+                } else {
+                    console.log('Welcome email sent successfully:', info.messageId);
+                }
+
+                res.status(201).json({
+                    message: "Supplier registered successfully",
+                    token,
+                    user
+                });
             });
         });
     });

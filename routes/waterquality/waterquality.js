@@ -17,45 +17,6 @@ const transporter = nodemailer.createTransport({
 });
 
 
-//Save ESP pH Data to mysql DB every 6 hour by cron job
-const ESP_IP_Ph = "192.168.1.113";
-
-async function saveSensorsData () {
-    try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
-
-        const response = await fetch(`http://${ESP_IP_Ph}/pH`, {
-            signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${await response.text()}`);
-        }
-
-        const data = await response.json();
-
-        const sql = 'INSERT INTO sensors_data (Pond_ID, pH) VALUES (?, ?)';
-
-        const values = [1, data.ph];
-
-        db.query(sql, values, (err, result) => {
-            if (err) {
-                console.error('Error inserting data: ', err);
-            } else {
-                console.log('Data inserted successfully');
-            }
-        });
-    } catch (error) {
-        if (error.name === 'AbortError') {
-            console.error('Fetch request timed out after 30 seconds');
-        } else {
-            console.error('Error fetching sensor data: ', error);
-        }
-    }
-}
-
 const ESP_IP = "192.168.1.127";
 
 async function saveSensors () {
@@ -74,9 +35,9 @@ async function saveSensors () {
 
         const data = await response.json();
 
-        const sql = 'INSERT INTO sensors_data (Pond_ID, water_Level, WaterTemp, TDS ) VALUES (?, ?, ?, ?)';
+        const sql = 'INSERT INTO sensors_data (Pond_ID, Water_Level, WaterTemp, TDS ) VALUES (?, ?, ?, ?)';
 
-        const values = [1, data.water_Level, data.WaterTemp, data.TDS];
+        const values = [1, data.waterLevelInside, data.waterTemp, data.tds];
 
         db.query(sql, values, (err, result) => {
             if (err) {
@@ -101,12 +62,8 @@ cron.schedule('0 */6 * * *', () => {
     saveSensors();
 });
 
-cron.schedule('0 */6 * * *', () => {
-    console.log("Scheduled Task Running for Sensors Data...")
-    saveSensorsData();
-});
 
-router.get('/api/sensors', async (req, res) => {
+router.get('/sensorsdatacome', async (req, res) => {
     try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
@@ -132,29 +89,6 @@ router.get('/api/sensors', async (req, res) => {
     }
 });
 
-router.get('/sensor-data', (req, res) => {
-    const sql = `
-        SELECT 
-            s.Pond_ID,
-            s.Water_Level,
-            s.WaterTemp,
-            s.pH,
-            s.TDS,
-            DATE(s.Updated_at) AS Date,
-            CONCAT(LPAD(HOUR(s.Updated_at), 2, '0'), '.00') AS Time
-        FROM sensors_data s
-        ORDER BY s.Pond_ID ASC, Date DESC, Time DESC
-    `;
-
-    db.query(sql, (err, results) => {
-        if (err) {
-            console.error(err);
-            return res.status(500).json({ error: 'Database query failed' });
-        }
-
-        res.json(results);
-    });
-});
 
 // Helper SQL: latest record per pond
 const baseQuery = `
