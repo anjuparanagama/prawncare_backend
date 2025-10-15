@@ -224,6 +224,89 @@ router.get("/tasks", authenticateToken, (req, res) => {
   });
 });
 
+// Update task status to completed
+router.patch("/update-task-status", authenticateToken, (req, res) => {
+  const { task_id } = req.body;
+  const userEmail = req.user.email;
+
+  if (task_id === undefined || task_id === null || task_id === '') {
+    return res.status(400).json({ error: 'Task ID is required' });
+  }
+
+  // Fetch worker_id from database using email
+  const getWorkerIdSql = "SELECT id FROM worker WHERE email = ?";
+  db.query(getWorkerIdSql, [userEmail], (err, workerResults) => {
+    if (err) {
+      return res.status(500).json({ error: 'Error fetching worker ID' });
+    }
+    if (workerResults.length === 0) {
+      return res.status(404).json({ error: 'Worker not found' });
+    }
+
+    const workerId = workerResults[0].worker_id || workerResults[0].id;
+
+    // Update task status to 'completed' only if it belongs to the worker
+    const updateSql = "UPDATE task SET status = 'completed' WHERE task_id = ? AND worker_id = ?";
+    db.query(updateSql, [task_id, workerId], (err, results) => {
+      if (err) {
+        console.error('Error updating task status: ', err);
+        return res.status(500).json({ error: 'Error updating task status' });
+      }
+
+      if (results.affectedRows === 0) {
+        return res.status(404).json({ error: 'Task not found or not assigned to this worker' });
+      }
+
+      // Fetch the current status of the task
+      const selectSql = "SELECT status FROM task WHERE task_id = ? AND worker_id = ?";
+      db.query(selectSql, [task_id, workerId], (err, taskResults) => {
+        if (err) {
+          console.error('Error fetching task status: ', err);
+          return res.status(500).json({ error: 'Error fetching task status' });
+        }
+
+        const currentStatus = taskResults[0] ? taskResults[0].status :
+         'completed';
+
+        // Send email notification
+        const transporter = nodemailer.createTransport({
+          service: 'gmail',
+          auth: {
+            user: process.env.EMAIL_USER,
+            pass: process.env.EMAIL_PASS
+          }
+        });
+
+        const mailOptions = {
+          from: process.env.EMAIL_USER,
+          to: 'anjulac2006@gmail.com',
+          subject: 'Task Status Updated',
+          text: `Task ID: ${task_id}\nStatus: ${currentStatus}`
+        };
+
+        transporter.sendMail(mailOptions, (error, info) => {
+          if (error) {
+            console.error('Error sending email: ', error);
+          } else {
+            console.log('Email sent: ' + info.response);
+          }
+        });
+
+        res.json({
+          message: 'Task status updated to completed successfully',
+          current_status: currentStatus,
+          notification: {
+            text: 'Task update',
+            status: currentStatus,
+            task_id: task_id
+          }
+        });
+      });
+    });
+  });
+});
+
+
 
 return router;
 };

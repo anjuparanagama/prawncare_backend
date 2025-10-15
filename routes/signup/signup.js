@@ -56,10 +56,59 @@ router.post("/customer-signup", async (req, res) => {
             const user = { id: result.insertId, name, email };
             const token = generateToken(user, "customer");
 
-            res.status(201).json({
-                message: "Customer registered successfully",
-                token,
-                user
+            // Configure Nodemailer
+            let transporter = nodemailer.createTransport({
+                host: 'smtp.gmail.com',
+                port: 587,
+                secure: false, // use TLS
+                auth: {
+                    user: process.env.EMAIL_USER, // store in .env for security
+                    pass: process.env.EMAIL_PASS
+                },
+                tls: {
+                    rejectUnauthorized: false
+                }
+            });
+
+            // Email content
+            let mailOptions = {
+                from: process.env.EMAIL_USER,
+                to: trimmedEmail,
+                subject: 'Welcome to PrawnCare!',
+                text: `Hello ${trimmedName},
+
+Welcome to PrawnCare! Your account has been created successfully.
+
+Username: ${trimmedName}
+Password: ${trimmedPassword}
+
+Please login using these credentials and keep them safe.
+
+Best regards,
+PrawnCare Team`
+            };
+
+            // Send email
+            transporter.sendMail(mailOptions, (err, info) => {
+                if (err) {
+                    console.error('Email send error details:', {
+                        code: err.code,
+                        errno: err.errno,
+                        syscall: err.syscall,
+                        hostname: err.hostname,
+                        message: err.message,
+                        stack: err.stack
+                    });
+                    // Still return success even if email fails
+                } else {
+                    console.log('Welcome email sent successfully:', info.messageId);
+                }
+
+                res.status(201).json({
+                    message: "Customer registered successfully",
+                    token,
+                    user
+                });
             });
         });
     });
@@ -119,66 +168,75 @@ router.post('/register-worker', async (req, res) => {
     const trimmedEmail = email?.trim();
     const trimmedPassword = password?.trim();
 
-    // 1. Hash password
-    const hashedPassword = await bcrypt.hash(trimmedPassword, 10);
+    // Check if mobile number exists
+    db.query("SELECT * FROM worker WHERE mobile_no = ?", [mobile_no], async (err, results) => {
+        if (err) return res.status(500).json({ error: "Database error" });
+        if (results.length > 0) return res.status(400).json({ message: "Mobile number already exists" });
 
-    // 2. Insert worker into DB
-    const sql = "INSERT INTO worker (name, email, password, mobile_no) VALUES (?, ?, ?, ?)";
-    db.query(sql, [name, email, hashedPassword, mobile_no], (error, result) => {
-        if (error) {
-            console.error("Signup error (worker):", error);
-            return res.status(500).json({ message: "Database insert failed" });
-        }
+        // 1. Hash password
+        const hashedPassword = await bcrypt.hash(trimmedPassword, 10);
 
-        const workerId = "PF" + result.insertId; // Add PF in front of ID
-
-        // 3. Configure Nodemailer
-        let transporter = nodemailer.createTransport({
-            host: 'smtp.gmail.com',
-            port: 587,
-            secure: false, // use TLS
-            auth: {
-                user: process.env.EMAIL_USER, // store in .env for security
-                pass: process.env.EMAIL_PASS
-            },
-            tls: {
-                rejectUnauthorized: false
-            }
-        });
-
-        // 4. Email content
-        let mailOptions = {
-            from: process.env.EMAIL_USER,
-            to: email,
-            subject: 'Your Worker Account Details',
-            text: `Hello ${name},
-
-                Your account has been created successfully.
-
-                Username: ${name}
-                Password: ${password}
-                User ID: ${workerId}
-
-                Please login using this credentials and dont forget these things.
-                `
-        };
-
-        // 5. Send email
-        transporter.sendMail(mailOptions, (err, info) => {
-            if (err) {
-                console.error('Email send error details:', {
-                    code: err.code,
-                    errno: err.errno,
-                    syscall: err.syscall,
-                    hostname: err.hostname,
-                    message: err.message,
-                    stack: err.stack
-                });
-                return res.status(500).json({ message: 'Worker registered but email failed', error: err.message });
+        // 2. Insert worker into DB
+        const sql = "INSERT INTO worker (name, email, password, mobile_no) VALUES (?, ?, ?, ?)";
+        db.query(sql, [name, email, hashedPassword, mobile_no], (error, result) => {
+            if (error) {
+                console.error("Signup error (worker):", error);
+                if (error.code === 'ER_DUP_ENTRY') {
+                    return res.status(400).json({ message: "Email already registered as a user" });
+                }
+                return res.status(500).json({ message: "Database insert failed" });
             }
 
-            console.log('Email sent successfully:', info.messageId);
-            res.json({ message: 'Worker registered and email sent', workerId });
+            const workerId = "PF" + result.insertId; // Add PF in front of ID
+
+            // 3. Configure Nodemailer
+            let transporter = nodemailer.createTransport({
+                host: 'smtp.gmail.com',
+                port: 587,
+                secure: false, // use TLS
+                auth: {
+                    user: process.env.EMAIL_USER, // store in .env for security
+                    pass: process.env.EMAIL_PASS
+                },
+                tls: {
+                    rejectUnauthorized: false
+                }
+            });
+
+            // 4. Email content
+            let mailOptions = {
+                from: process.env.EMAIL_USER,
+                to: email,
+                subject: 'Your Worker Account Details',
+                text: `Hello ${name},
+
+                    Your account has been created successfully.
+
+                    Username: ${name}
+                    Password: ${password}
+                    User ID: ${workerId}
+
+                    Please login using this credentials and dont forget these things.
+                    `
+            };
+
+            // 5. Send email
+            transporter.sendMail(mailOptions, (err, info) => {
+                if (err) {
+                    console.error('Email send error details:', {
+                        code: err.code,
+                        errno: err.errno,
+                        syscall: err.syscall,
+                        hostname: err.hostname,
+                        message: err.message,
+                        stack: err.stack
+                    });
+                    return res.status(500).json({ message: 'Worker registered but email failed', error: err.message });
+                }
+
+                console.log('Email sent successfully:', info.messageId);
+                res.json({ message: 'Worker registered and email sent', workerId });
+            });
         });
     });
 });
