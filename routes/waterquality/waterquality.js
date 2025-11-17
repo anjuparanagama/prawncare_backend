@@ -312,4 +312,27 @@ async function checkConditionsAndSendAlert() {
 // ✅ Run check every 1 minute (you can change this)
 setInterval(checkConditionsAndSendAlert, 60 * 1000);
 
+// New route to send sensor data to frontend
+router.get('/sensor-data', (req, res) => {
+  const sql = `
+    SELECT
+      s.Pond_ID,
+      s.Water_Level,
+      s.pH,
+      s.WaterTemp,
+      s.TDS,
+      DATE_FORMAT(s.Updated_at, '%Y/%m/%d') AS Date,
+      CONCAT(LPAD(HOUR(s.Updated_at), 2, '0'), '.00') AS Time
+    FROM sensors_data s
+    ORDER BY s.Updated_at DESC
+  `;
+
+  db.query(sql, (err, results) => {
+    if (err) {
+      return res.status(500).json({ error: 'Database query failed', details: err.message });
+    }
+    res.json(results);
+  });
+});
+
 module.exports= router;

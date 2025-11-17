@@ -32,7 +32,7 @@ router.post('/login', (req, res) => {
         return res.status(400).json({ message: 'User Name and Password are required' });
     }
 
-    const sql = 'SELECT * FROM admin WHERE name = ? AND password = ?';
+    const sql = 'SELECT * FROM admin WHERE name = ? AND BINARY password = ?';
     db.query(sql, [userName, password], (error, results) => {
         if (error) {
             return res.status(500).json({ error: 'Database query failed' });
